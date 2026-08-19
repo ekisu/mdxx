@@ -1,10 +1,12 @@
 import { parseDocument } from "../document/parse.ts";
 import { discoverImports } from "../imports/discover.ts";
 import { readDocument } from "../shared/paths.ts";
+import { discoverAssets } from "../assets/discover.ts";
 
 export async function inspect(path: string): Promise<Record<string, unknown>> {
   const document = parseDocument(await readDocument(path));
   const graph = await discoverImports(path, document.body);
+  const assets = await discoverAssets(path, document.body, graph);
   return {
     path,
     sourceDigest: document.sourceDigest,
@@ -14,7 +16,8 @@ export async function inspect(path: string): Promise<Record<string, unknown>> {
       : { present: false },
     imports: graph.imports,
     packages: graph.packages,
-    assets: graph.assets,
-    remoteUrls: graph.remoteUrls,
+    assets: assets.files,
+    styles: assets.styles,
+    remoteUrls: assets.remoteUrls,
   };
 }

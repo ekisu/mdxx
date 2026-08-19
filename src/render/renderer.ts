@@ -5,15 +5,17 @@ import { bundleDocument } from "./bundle.ts";
 import { createHtml } from "./html.ts";
 import { renderInWorker } from "./worker.ts";
 import type { BundleDependencies } from "./bundle.ts";
+import type { EmittedAssets } from "../assets/emit.ts";
 
 export async function renderDocument(
   documentPath: string,
   metadata: Record<string, unknown>,
   dependencies?: BundleDependencies,
+  assets?: EmittedAssets,
 ): Promise<string> {
   const temporary = await mkdtemp(join(tmpdir(), "mdxx-render-"));
   try {
-    const bundles = await bundleDocument(documentPath, temporary, dependencies);
+    const bundles = await bundleDocument(documentPath, temporary, dependencies, assets);
     const markup = await renderInWorker(bundles.serverPath, metadata);
     return createHtml({ markup, metadata, clientJavaScript: bundles.clientJavaScript, css: bundles.css });
   } finally {

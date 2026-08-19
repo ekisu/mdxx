@@ -67,6 +67,7 @@ export async function discoverImports(documentPath: string, mdxBody: string): Pr
   const packages = new Map<string, PackageSpecifier>();
   const imports: ImportReference[] = [];
   const assets = new Set<string>();
+  const styles = new Set<string>();
   const remoteUrls = new Set<string>();
 
   while (pending.length > 0) {
@@ -84,9 +85,10 @@ export async function discoverImports(documentPath: string, mdxBody: string): Pr
       if (specifier.startsWith(".") || specifier.startsWith("/")) {
         const resolved = await resolveLocalModule(current.path, specifier);
         if (!resolved) throw new MdxxError("MISSING_LOCAL_FILE", `cannot resolve ${specifier} from ${current.path}`);
-        const kind = isCodePath(resolved) ? "module" : "asset";
+        const kind = extname(resolved).toLowerCase() === ".css" ? "style" : isCodePath(resolved) ? "module" : "asset";
         imports.push({ importer: current.path, specifier, kind, resolved });
         if (kind === "module") pending.push({ path: resolved });
+        else if (kind === "style") styles.add(resolved);
         else assets.add(resolved);
         continue;
       }
@@ -103,6 +105,7 @@ export async function discoverImports(documentPath: string, mdxBody: string): Pr
     packages: [...packages.values()].sort((a, b) => byText(a.original, b.original)),
     imports: imports.sort((a, b) => byText(`${a.importer}\0${a.specifier}`, `${b.importer}\0${b.specifier}`)),
     assets: [...assets].sort(byText),
+    styles: [...styles].sort(byText),
     remoteUrls: [...remoteUrls].sort(byText),
   };
 }

@@ -4,6 +4,7 @@ import { MdxxError } from "../shared/errors.ts";
 import { clientEntry } from "./client-entry.ts";
 import { mdxPlugin } from "./compile.ts";
 import { serverEntry } from "./server-entry.ts";
+import type { EmittedAssets } from "../assets/emit.ts";
 
 export interface RenderBundles {
   serverPath: string;
@@ -43,12 +44,45 @@ function dependencyPlugin(dependencies?: BundleDependencies): Bun.BunPlugin {
     setup(builder) {
       if (!dependencies) return;
       builder.onResolve({ filter: /^[^.\/]|^@/ }, ({ path }) => {
+        if (path.includes(":")) return undefined;
         const mapped = dependencies.mappings.get(path) ?? path;
         try {
           return { path: Bun.resolveSync(mapped, dependencies.directory) };
         } catch {
           return undefined;
         }
+      });
+    },
+  };
+}
+
+function assetPlugin(assets?: EmittedAssets): Bun.BunPlugin {
+  return {
+    name: "mdxx-assets",
+    setup(builder) {
+      if (!assets) return;
+      builder.onResolve({ filter: /^https:\/\/mdxx\.invalid\// }, ({ path }) => ({ path, external: true }));
+      builder.onResolve({ filter: /^\.?\.?\// }, ({ path, importer }) => {
+        const reference = assets.references.find((item) => item.importer === importer && item.specifier === path && item.resolved);
+        if (!reference?.resolved || !assets.urls.has(reference.resolved)) return undefined;
+        return { path: reference.resolved, namespace: "mdxx-asset" };
+      });
+      builder.onLoad({ filter: /.*/, namespace: "mdxx-asset" }, ({ path }) => ({
+        contents: `export default ${JSON.stringify(assets.urls.get(path))}`,
+        loader: "js",
+      }));
+      builder.onLoad({ filter: /\.(?:css|ts|tsx|js|jsx|mjs|mts)$/ }, async ({ path }) => {
+        if (path.includes("node_modules")) return undefined;
+        const references = assets.references.filter((item) => item.importer === path && item.resolved);
+        if (references.length === 0) return undefined;
+        let contents = await Bun.file(path).text();
+        const css = path.endsWith(".css");
+        for (const reference of references) {
+          const url = reference.resolved ? assets.urls.get(reference.resolved) : undefined;
+          if (url) contents = contents.replaceAll(reference.specifier, css ? `https://mdxx.invalid/${url}` : url);
+        }
+        const extension = path.slice(path.lastIndexOf(".") + 1);
+        return { contents, loader: extension as "css" | "ts" | "tsx" | "js" | "jsx" };
       });
     },
   };
@@ -65,19 +99,20 @@ export async function bundleDocument(
   documentPath: string,
   directory: string,
   dependencies?: BundleDependencies,
+  assets?: EmittedAssets,
 ): Promise<RenderBundles> {
   const serverDirectory = join(directory, "server");
   await mkdir(serverDirectory, { recursive: true });
   const server = await Bun.build({
     entrypoints: ["mdxx-server-entry"],
     outdir: serverDirectory,
-    naming: "server.js",
+    naming: { entry: "[name].[ext]", asset: "[name].[ext]" },
     target: "bun",
     format: "esm",
     packages: "bundle",
     minify: false,
     sourcemap: "none",
-    plugins: [entryPlugin("mdxx-server-entry", serverEntry(documentPath)), runtimePlugin(), dependencyPlugin(dependencies), mdxPlugin()],
+    plugins: [entryPlugin("mdxx-server-entry", serverEntry(documentPath)), runtimePlugin(), dependencyPlugin(dependencies), assetPlugin(assets), mdxPlugin(assets?.references, assets?.urls)],
   });
   await assertBuild(server, "server");
 
@@ -88,14 +123,14 @@ export async function bundleDocument(
     packages: "bundle",
     minify: true,
     sourcemap: "none",
-    plugins: [entryPlugin("mdxx-client-entry", clientEntry(documentPath)), runtimePlugin(), dependencyPlugin(dependencies), mdxPlugin()],
+    plugins: [entryPlugin("mdxx-client-entry", clientEntry(documentPath)), runtimePlugin(), dependencyPlugin(dependencies), assetPlugin(assets), mdxPlugin(assets?.references, assets?.urls)],
   });
   await assertBuild(client, "browser");
 
   const javascript = client.outputs.find((output) => output.path.endsWith(".js"));
   if (!javascript) throw new MdxxError("BUNDLE_FAILED", "browser bundle produced no JavaScript");
   const cssOutputs = client.outputs.filter((output) => output.path.endsWith(".css"));
-  const css = await Promise.all(cssOutputs.map((output) => output.text()));
+  const css = await Promise.all(cssOutputs.map(async (output) => (await output.text()).replaceAll("https://mdxx.invalid/", "")));
 
   const serverFiles = await readdir(serverDirectory);
   const serverFile = serverFiles.find((path) => path.endsWith(".js"));

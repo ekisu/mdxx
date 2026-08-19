@@ -6,6 +6,8 @@ import { prepareDependencies } from "../dependencies/resolve.ts";
 import { renderDocument } from "../render/renderer.ts";
 import { MdxxError } from "../shared/errors.ts";
 import { readDocument } from "../shared/paths.ts";
+import { discoverAssets } from "../assets/discover.ts";
+import { emitAssets } from "../assets/emit.ts";
 
 export interface BuildOptions {
   output: string;
@@ -21,7 +23,7 @@ export async function build(path: string, options: BuildOptions): Promise<string
   if (document.lock && !document.lockFresh) throw new MdxxError("STALE_LOCK", "embedded lock does not match the document source");
   if (options.locked && !document.lock) throw new MdxxError("LOCK_REQUIRED", "--locked requires a current embedded lock");
   const graph = await discoverImports(documentPath, document.body);
-  if (graph.assets.length > 0) throw new MdxxError("ASSETS_PENDING", "asset imports require asset processing support");
+  const assets = await discoverAssets(documentPath, document.body, graph);
 
   const prepared = await prepareDependencies(graph.packages, document.lock);
 
@@ -30,7 +32,8 @@ export async function build(path: string, options: BuildOptions): Promise<string
   const staging = join(parent, `.mdxx-${basename(output)}-${crypto.randomUUID()}`);
   try {
     await mkdir(staging);
-    const html = await renderDocument(documentPath, document.metadata, prepared.environment);
+    const emitted = await emitAssets(assets, join(staging, "assets"));
+    const html = await renderDocument(documentPath, document.metadata, prepared.environment, emitted);
     const name = basename(documentPath, extname(documentPath));
     await Bun.write(join(staging, `${name}.html`), html);
     await rename(staging, output);

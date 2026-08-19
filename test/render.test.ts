@@ -32,3 +32,39 @@ export function Greeting({name}) { return <strong>Hello {name}</strong> }
     await Bun.$`rm -rf ${directory}`;
   }
 }, 30_000);
+
+test("hashes, deduplicates, and rewrites local assets and CSS", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "assets.mdx");
+  try {
+    await Bun.write(join(directory, "one.png"), "same bytes");
+    await Bun.write(join(directory, "two.png"), "same bytes");
+    await Bun.write(join(directory, "style.css"), ".hero { background: url('./one.png'); color: rgb(1, 2, 3); }");
+    await Bun.write(
+      document,
+      `---
+mdxx:
+  format: 1
+---
+
+import './style.css'
+
+![One](./one.png)
+
+<img src="./two.png" />
+
+![Remote](https://example.test/image.png)
+`,
+    );
+    const htmlPath = await build(document, { output: join(directory, "output") });
+    const html = await Bun.file(htmlPath).text();
+    const files = await Array.fromAsync(new Bun.Glob("assets/*").scan({ cwd: join(directory, "output") }));
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatch(/^assets\/one\.[0-9a-f]{8}\.png$/);
+    expect(html.match(/assets\/one\.[0-9a-f]{8}\.png/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(html).toContain("https://example.test/image.png");
+    expect(html).toContain("color:#010203");
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
