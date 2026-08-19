@@ -1,0 +1,75 @@
+---
+title: mdxx / Version One Delivery Plan
+description: An interactive implementation brief for reproducible MDX documents.
+mdxx:
+  format: 1
+  requires: ">=1 <2"
+---
+
+import {useState} from 'react'
+import './mdxx-project-plan.css'
+export interface Phase {
+  id: string
+  label: string
+  window: string
+  progress: number
+  tone: string
+  summary: string
+  outcomes: string[]
+}
+export const phases: Phase[] = [
+  {id: 'foundation', label: 'Foundation', window: 'Weeks 1-2', progress: 100, tone: 'mint', summary: 'The document contract and command surface become stable.', outcomes: ['Strict YAML and lock parsing', 'CLI diagnostics and atomic writes', 'Deterministic import discovery']},
+  {id: 'renderer', label: 'Renderer', window: 'Weeks 3-4', progress: 92, tone: 'sky', summary: 'Authored MDX becomes server-rendered, interactive HTML.', outcomes: ['Typed inline components', 'SSR in a worker subprocess', 'Browser hydration and CSS bundling']},
+  {id: 'supply-chain', label: 'Supply chain', window: 'Weeks 5-6', progress: 84, tone: 'amber', summary: 'Dependencies and assets become inspectable build inputs.', outcomes: ['Frozen Bun dependency graph', 'Integrity and target checks', 'Content-addressed local assets']},
+  {id: 'hardening', label: 'Hardening', window: 'Weeks 7-8', progress: 68, tone: 'coral', summary: 'Acceptance tests turn the format contract into evidence.', outcomes: ['Cross-directory byte comparison', 'Hydration interaction tests', 'Isolation and failure limits']}
+]
+export function PhaseExplorer() {
+  const [active, setActive] = useState(phases[0])
+  return <section className="phase-explorer" aria-labelledby="phase-title"><div className="section-heading"><p className="eyebrow">Delivery sequence</p><h2 id="phase-title">Four deliberate passes</h2><p>Select a phase to inspect its exit criteria.</p></div><div className="phase-layout"><div className="phase-tabs" role="tablist" aria-label="Delivery phases">{phases.map((phase, index) => <button key={phase.id} className={active.id === phase.id ? 'phase-tab active' : 'phase-tab'} onClick={() => setActive(phase)} role="tab" aria-selected={active.id === phase.id}><span className="phase-number">0{index + 1}</span><span><strong>{phase.label}</strong><small>{phase.window}</small></span><span className={`status-dot ${phase.tone}`} /></button>)}</div><article className={`phase-detail ${active.tone}`} role="tabpanel"><div className="phase-detail-top"><span>{active.window}</span><strong>{active.progress}%</strong></div><div className="progress-track"><span style={{width: `${active.progress}%`}} /></div><h3>{active.label}</h3><p>{active.summary}</p><ul>{active.outcomes.map(outcome => <li key={outcome}>{outcome}</li>)}</ul></article></div></section>
+}
+export function ArchitectureGraph() {
+  return <figure className="architecture-card"><figcaption><span>Execution model</span><strong>One pipeline, two bundles</strong></figcaption><svg viewBox="0 0 760 330" role="img" aria-labelledby="architecture-title"><title id="architecture-title">mdxx document processing architecture</title><defs><linearGradient id="flow" x1="0" x2="1"><stop offset="0" stopColor="#65e8bf"/><stop offset="1" stopColor="#6bb8ff"/></linearGradient><filter id="glow"><feGaussianBlur stdDeviation="5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter></defs><g className="flow-lines" fill="none" stroke="url(#flow)" strokeWidth="3"><path d="M170 165 H265"/><path d="M405 165 H470"/><path d="M610 135 H680 V72"/><path d="M610 195 H680 V258"/></g><g className="graph-node source"><rect x="20" y="105" width="150" height="120" rx="18"/><text x="95" y="148" textAnchor="middle">SOURCE</text><text x="95" y="178" textAnchor="middle" className="node-main">document.mdx</text><text x="95" y="202" textAnchor="middle" className="node-note">frontmatter + code</text></g><g className="graph-node"><rect x="265" y="105" width="140" height="120" rx="18"/><text x="335" y="148" textAnchor="middle">VALIDATE</text><text x="335" y="178" textAnchor="middle" className="node-main">graph + lock</text><text x="335" y="202" textAnchor="middle" className="node-note">reject undeclared input</text></g><g className="graph-node active" filter="url(#glow)"><rect x="470" y="105" width="140" height="120" rx="18"/><text x="540" y="148" textAnchor="middle">COMPILE</text><text x="540" y="178" textAnchor="middle" className="node-main">Bun + MDX</text><text x="540" y="202" textAnchor="middle" className="node-note">shared module graph</text></g><g className="graph-node output"><rect x="620" y="20" width="120" height="84" rx="16"/><text x="680" y="55" textAnchor="middle">SERVER</text><text x="680" y="80" textAnchor="middle" className="node-main">SSR</text></g><g className="graph-node output"><rect x="620" y="226" width="120" height="84" rx="16"/><text x="680" y="261" textAnchor="middle">BROWSER</text><text x="680" y="286" textAnchor="middle" className="node-main">hydrate</text></g></svg><div className="graph-legend"><span><i className="legend-source"/>authored input</span><span><i className="legend-process"/>deterministic process</span><span><i className="legend-output"/>generated output</span></div></figure>
+}
+export function DeliveryBars() {
+  return <figure className="delivery-card"><figcaption><span>Readiness by capability</span><strong>Version-one confidence</strong></figcaption><div className="bar-chart">{[{label: 'Format contract', value: 100}, {label: 'SSR + hydration', value: 94}, {label: 'Dependency locks', value: 88}, {label: 'Asset pipeline', value: 86}, {label: 'Isolation baseline', value: 72}].map(item => <div className="bar-row" key={item.label}><div><span>{item.label}</span><strong>{item.value}</strong></div><div className="bar-track"><span style={{width: `${item.value}%`}} /></div></div>)}</div><p className="chart-note"><span />Target: every release claim backed by a fixture.</p></figure>
+}
+
+<article className="plan-shell">
+  <header className="hero">
+    <nav><a className="wordmark" href="#top" aria-label="mdxx home"><span>m</span>dx<span>x</span></a><span className="document-chip">Implementation brief / 01</span></nav>
+    <div className="hero-grid" id="top">
+      <div className="hero-copy">
+        <p className="eyebrow">Version one delivery plan</p>
+        <h1>Documents that carry their <em>own evidence.</em></h1>
+        <p className="lede">mdxx turns self-describing MDX into deterministic, interactive HTML. This plan keeps the architecture narrow: one source graph, one build path, and explicit boundaries around every input.</p>
+        <div className="hero-actions"><a href="#sequence" className="primary-action">Explore the sequence <span>down</span></a><a href="#architecture" className="text-action">See the system map</a></div>
+      </div>
+      <aside className="north-star"><p>North star</p><strong>Same declared inputs</strong><span>produce</span><strong>the same output bytes.</strong><div className="signal"><i/><i/><i/><i/></div></aside>
+    </div>
+    <div className="metrics-strip"><div><span>01</span><strong>authored file</strong><small>MDX stays recognizable</small></div><div><span>02</span><strong>isolated bundles</strong><small>server + browser</small></div><div><span>03</span><strong>integrity layers</strong><small>source + packages + assets</small></div><div><span>00</span><strong>hidden inputs</strong><small>the target condition</small></div></div>
+  </header>
+
+  <section className="principles">
+    <div className="section-heading"><p className="eyebrow">Operating principles</p><h2>Constrain first.<br/>Extend with evidence.</h2></div>
+    <div className="principle-grid"><article><span>01 / Familiar</span><h3>Keep MDX ordinary</h3><p>Imports remain imports. Metadata remains YAML. The reproducibility layer stays visible without inventing another authoring language.</p></article><article><span>02 / Reproducible</span><h3>Declare every input</h3><p>Package graphs are frozen, local assets are content-addressed, and renderer conditions are part of the target.</p></article><article><span>03 / Contained</span><h3>Execute out of process</h3><p>Rendering never evaluates document code in the CLI process. Limits and explicit caveats define the initial trust boundary.</p></article></div>
+  </section>
+
+  <div id="sequence"><PhaseExplorer /></div>
+
+  <section className="system-section" id="architecture">
+    <div className="section-heading horizontal"><div><p className="eyebrow">System shape</p><h2>A narrow waist<br/>for the toolchain.</h2></div><p>Discovery feeds both dependency resolution and rendering. Build and run share the exact same output path, preventing a second development-only contract from emerging.</p></div>
+    <div className="graph-grid"><ArchitectureGraph /><DeliveryBars /></div>
+  </section>
+
+  <section className="workstreams">
+    <div className="section-heading"><p className="eyebrow">Parallel workstreams</p><h2>What moves together</h2></div>
+    <div className="workstream-table"><div className="table-head"><span>Track</span><span>Primary question</span><span>Proof</span></div><div><strong>A / Format</strong><span>Can malformed or ambiguous input enter the graph?</span><span className="proof">Parser fixtures</span></div><div><strong>B / Runtime</strong><span>Can server markup hydrate without changing meaning?</span><span className="proof">DOM interaction</span></div><div><strong>C / Supply chain</strong><span>Can every installed byte be tied to the lock?</span><span className="proof">Frozen reinstall</span></div><div><strong>D / Output</strong><span>Can another machine emit the same tree?</span><span className="proof">Byte comparison</span></div></div>
+  </section>
+
+  <section className="risks">
+    <div><p className="eyebrow">Decisions held explicitly</p><h2>Known edges,<br/>not hidden promises.</h2></div>
+    <ol><li><span>01</span><div><strong>OS-level sandboxing</strong><p>Subprocess separation clears secrets and contains failures, but filesystem and network enforcement remains platform-dependent.</p></div><mark>Track</mark></li><li><span>02</span><div><strong>Remote asset mutability</strong><p>Remote URLs are preserved and reported. Their later bytes intentionally remain outside the deterministic build contract.</p></div><mark>Accept</mark></li><li><span>03</span><div><strong>Renderer evolution</strong><p>The mdxx major version owns compiler, React, serializer, and bundler behavior. Contract changes require a deliberate version boundary.</p></div><mark>Guard</mark></li></ol>
+  </section>
+
+  <footer><div><span className="wordmark"><span>m</span>dx<span>x</span></span><p>Reproducible documents,<br/>without leaving MDX behind.</p></div><div><span>Exit condition</span><strong>A plain document builds twice,<br/>hydrates once, and differs by zero bytes.</strong></div><a href="#top">Back to top / up</a></footer>
+</article>
