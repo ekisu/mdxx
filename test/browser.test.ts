@@ -4,6 +4,8 @@ import { Window } from "happy-dom";
 import { build } from "../src/commands/build.ts";
 import { startRun } from "../src/commands/run.ts";
 
+const CHROMIUM_PATH = process.env.CHROMIUM_PATH ?? "chromium";
+
 test("mounts plain MDX in Chromium without build-time evaluation", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const document = join(directory, "browser.mdx");
@@ -15,7 +17,7 @@ test("mounts plain MDX in Chromium without build-time evaluation", async () => {
     const session = await startRun(document);
     try {
       const process = Bun.spawn(
-        ["chromium", "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=2000", "--dump-dom", session.url],
+        [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=2000", "--dump-dom", session.url],
         { stdout: "pipe", stderr: "pipe" },
       );
       const [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
@@ -115,7 +117,7 @@ import {PieChart} from 'react-minimal-pie-chart@9.1.2'
     const session = await startRun(document);
     try {
       const process = Bun.spawn(
-        ["chromium", "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=2000", "--dump-dom", session.url],
+        [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=2000", "--dump-dom", session.url],
         { stdout: "pipe", stderr: "pipe" },
       );
       const [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
@@ -159,7 +161,7 @@ export function Dynamic() {
     const session = await startRun(document);
     try {
       const process = Bun.spawn(
-        ["chromium", "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=2000", "--dump-dom", session.url],
+        [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=2000", "--dump-dom", session.url],
         { stdout: "pipe", stderr: "pipe" },
       );
       const [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
@@ -207,7 +209,7 @@ export function WorkerResult() {
     const session = await startRun(document);
     try {
       const process = Bun.spawn(
-        ["chromium", "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=2000", "--dump-dom", session.url],
+        [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=2000", "--dump-dom", session.url],
         { stdout: "pipe", stderr: "pipe" },
       );
       const [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
@@ -227,7 +229,7 @@ test("mounts the flagship microgrid visualization stack", async () => {
   const session = await startRun(document);
   try {
     const process = Bun.spawn(
-      ["chromium", "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=3000", "--dump-dom", session.url],
+      [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=3000", "--dump-dom", session.url],
       { stdout: "pipe", stderr: "pipe" },
     );
     const [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
@@ -246,7 +248,7 @@ test("mounts the self-contained vanilla graph without a stylesheet", async () =>
   const session = await startRun(document);
   try {
     const process = Bun.spawn(
-      ["chromium", "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=1000", "--dump-dom", session.url],
+      [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=1000", "--dump-dom", session.url],
       { stdout: "pipe", stderr: "pipe" },
     );
     const [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);

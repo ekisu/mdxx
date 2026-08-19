@@ -9,6 +9,7 @@ import { parseBunLock, type ResolvedPackage } from "./bun-lock.ts";
 import type { DependencyEnvironment } from "./environment.ts";
 import { satisfies, validRange } from "semver";
 import { REACT_DOM_VERSION, REACT_VERSION, reactRuntime } from "../render/runtime.ts";
+import { MDXX_VERSION } from "../version.ts";
 
 export interface LockedRoot extends PackageSpecifier {
   version: string;
@@ -48,7 +49,7 @@ function isDependencyLock(lock: EmbeddedLock): lock is DependencyLock {
   if (canonicalJson(lock.react) !== canonicalJson(reactRuntime)) return false;
   if (lock.resolver === null || typeof lock.resolver !== "object") return false;
   const resolver = lock.resolver as Record<string, unknown>;
-  if (resolver.name !== "mdxx" || resolver.version !== "1.0.0") return false;
+  if (resolver.name !== "mdxx" || resolver.version !== MDXX_VERSION) return false;
   return lock.roots.every((root) => root !== null && typeof root === "object") &&
     lock.packages.every((item) => item !== null && typeof item === "object");
 }
@@ -221,7 +222,7 @@ export async function prepareDependencies(
         peers,
         resolver: {
           name: "mdxx",
-          version: "1.0.0",
+          version: MDXX_VERSION,
           ...(installation.lockSource ? { state: { format: "bun-lock-v1" as const, contents: installation.lockSource } } : {}),
         },
         target: currentTarget(),

@@ -2,6 +2,31 @@
 
 CLI for rendering reproducible, interactive HTML from self-describing MDX documents. See [`DESIGN.md`](./DESIGN.md) for the approved format and rendering contract.
 
+## Installation
+
+mdxx requires [Bun](https://bun.sh/) 1.3.13 or newer. Run it without installing:
+
+```bash
+bunx @ekisu/mdxx init document.mdx
+bunx @ekisu/mdxx run document.mdx
+```
+
+It can also be invoked through npm's package runner when Bun is installed:
+
+```bash
+npx @ekisu/mdxx init document.mdx
+npx @ekisu/mdxx run document.mdx
+```
+
+Install it globally when the shorter `mdxx` command is preferred:
+
+```bash
+bun add --global @ekisu/mdxx
+mdxx --help
+```
+
+## Development
+
 Enter the development environment and install dependencies:
 
 ```bash

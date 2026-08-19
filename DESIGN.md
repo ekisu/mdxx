@@ -38,7 +38,7 @@ title: Quarterly report
 
 mdxx:
   format: 1
-  requires: ">=1 <2"
+  requires: ">=0.1 <1"
   render:
     mode: interactive
 ---
@@ -71,7 +71,7 @@ The initial schema is:
 ```yaml
 mdxx:
   format: 1
-  requires: ">=1 <2"
+  requires: ">=0.1 <1"
   render:
     mode: interactive
 ```
@@ -153,7 +153,7 @@ Locking is optional. `mdxx lock document.mdx` appends or replaces a generated JS
   "sourceDigest": "sha256-...",
   "resolver": {
     "name": "mdxx",
-    "version": "1.0.0"
+    "version": "0.1.0"
   },
   "target": {
     "runtime": "node",
