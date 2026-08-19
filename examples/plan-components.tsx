@@ -1,4 +1,5 @@
-import { useState, type KeyboardEvent } from "react";
+import { useState } from "react";
+import { PieChart } from "react-minimal-pie-chart@9.1.2";
 
 interface Phase {
   id: string;
@@ -79,82 +80,93 @@ export function PhaseExplorer() {
   );
 }
 
+interface PipelineNode {
+  id: string;
+  label: string;
+  x: number;
+  y: number;
+  tone?: string;
+}
+
+interface PipelineLink {
+  source: PipelineNode;
+  target: PipelineNode;
+}
+
+const graphNodes: PipelineNode[] = [
+  { id: "source", label: "document.mdx", x: 90, y: 165, tone: "source" },
+  { id: "validate", label: "graph + lock", x: 270, y: 165 },
+  { id: "compile", label: "Bun + MDX", x: 450, y: 165, tone: "compile" },
+  { id: "server", label: "SSR bundle", x: 630, y: 85, tone: "output" },
+  { id: "browser", label: "browser bundle", x: 630, y: 245, tone: "output" },
+];
+
+const byId = Object.fromEntries(graphNodes.map((node) => [node.id, node]));
+const graphLinks: PipelineLink[] = [
+  { source: byId.source as PipelineNode, target: byId.validate as PipelineNode },
+  { source: byId.validate as PipelineNode, target: byId.compile as PipelineNode },
+  { source: byId.compile as PipelineNode, target: byId.server as PipelineNode },
+  { source: byId.compile as PipelineNode, target: byId.browser as PipelineNode },
+];
+
+const nodeDescriptions: Record<string, string> = {
+  source: "The authored MDX, strict frontmatter, local modules, and asset references form the declared source graph.",
+  validate: "Discovery rejects forbidden imports and checks lock freshness before any document code executes.",
+  compile: "One pinned MDX and Bun pipeline creates matching server and browser module graphs.",
+  server: "A cleared-environment subprocess renders deterministic initial markup twice and compares it.",
+  browser: "The inlined client bundle hydrates the same component tree and activates interactions.",
+};
+
 function ArchitectureGraph() {
-  const descriptions: Record<string, string> = {
-    source: "The authored MDX, strict frontmatter, local modules, and asset references form the declared source graph.",
-    validate: "Discovery rejects forbidden imports and checks lock freshness before any document code executes.",
-    compile: "One pinned MDX and Bun pipeline creates matching server and browser module graphs.",
-    server: "A cleared-environment subprocess renders deterministic initial markup twice and compares it.",
-    browser: "The inlined client bundle hydrates the same component tree and activates interactions.",
-  };
   const [selected, setSelected] = useState("compile");
   return (
     <figure className="architecture-card">
-      <figcaption><span>Execution model</span><strong>One pipeline, two bundles</strong></figcaption>
-      <svg viewBox="0 0 760 330" role="img" aria-labelledby="architecture-title">
-        <title id="architecture-title">mdxx document processing architecture</title>
-        <defs>
-          <linearGradient id="flow" x1="0" x2="1"><stop offset="0" stopColor="#65e8bf"/><stop offset="1" stopColor="#6bb8ff"/></linearGradient>
-          <filter id="glow"><feGaussianBlur stdDeviation="5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
-        </defs>
-        <g className="flow-lines" fill="none" stroke="url(#flow)" strokeWidth="3"><path d="M170 165 H265"/><path d="M405 165 H470"/><path d="M610 135 H680 V72"/><path d="M610 195 H680 V258"/></g>
-        <GraphNode id="source" selected={selected === "source"} onSelect={setSelected} className="source" x={20} y={105} width={150} height={120} label="SOURCE" main="document.mdx" note="frontmatter + code" />
-        <GraphNode id="validate" selected={selected === "validate"} onSelect={setSelected} x={265} y={105} width={140} height={120} label="VALIDATE" main="graph + lock" note="reject undeclared input" />
-        <GraphNode id="compile" selected={selected === "compile"} onSelect={setSelected} className="active" x={470} y={105} width={140} height={120} label="COMPILE" main="Bun + MDX" note="shared module graph" glow />
-        <GraphNode id="server" selected={selected === "server"} onSelect={setSelected} className="output" x={620} y={20} width={120} height={84} label="SERVER" main="SSR" />
-        <GraphNode id="browser" selected={selected === "browser"} onSelect={setSelected} className="output" x={620} y={226} width={120} height={84} label="BROWSER" main="hydrate" />
+      <figcaption><span>Pipeline / local React</span><strong>Select a pipeline node</strong></figcaption>
+      <svg className="network-graph" viewBox="0 0 720 330" role="img" aria-label="mdxx document processing architecture">
+        <defs><marker id="network-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto-start-reverse"><path d="M 0 0 L 10 5 L 0 10 z" /></marker></defs>
+        {graphLinks.map((link) => <line key={`${link.source.id}-${link.target.id}`} className="network-link" x1={link.source.x} y1={link.source.y} x2={link.target.x} y2={link.target.y} markerEnd="url(#network-arrow)" />)}
+        {graphNodes.map((node) => (
+          <g key={node.id} className={`network-node ${node.tone ?? ""} ${selected === node.id ? "selected" : ""}`} transform={`translate(${node.x} ${node.y})`} role="button" tabIndex={0} aria-label={`Inspect ${node.id}`} onClick={() => setSelected(node.id)} onKeyDown={(event) => {
+              if (event.key === "Enter" || event.key === " ") setSelected(node.id);
+            }}>
+            <rect x="-68" y="-29" width="136" height="58" rx="3" />
+            <text textAnchor="middle" dominantBaseline="middle">{node.label}</text>
+          </g>
+        ))}
       </svg>
-      <div className="graph-legend"><span><i className="legend-source"/>authored input</span><span><i className="legend-process"/>deterministic process</span><span><i className="legend-output"/>generated output</span></div>
-      <div className="node-inspector" aria-live="polite"><span>{selected}</span><p>{descriptions[selected]}</p></div>
+      <div className="node-inspector" aria-live="polite"><span>{selected}</span><p>{nodeDescriptions[selected]}</p></div>
     </figure>
-  );
-}
-
-interface GraphNodeProps {
-  id: string;
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  label: string;
-  main: string;
-  note?: string;
-  className?: string;
-  glow?: boolean;
-  selected: boolean;
-  onSelect: (id: string) => void;
-}
-
-function GraphNode({ id, x, y, width, height, label, main, note, className = "", glow = false, selected, onSelect }: GraphNodeProps) {
-  const center = x + width / 2;
-  const activate = (event: KeyboardEvent<SVGGElement>) => {
-    if (event.key === "Enter" || event.key === " ") {
-      event.preventDefault();
-      onSelect(id);
-    }
-  };
-  return (
-    <g className={`graph-node ${className} ${selected ? "selected" : ""}`} filter={glow ? "url(#glow)" : undefined} role="button" tabIndex={0} aria-label={`Inspect ${label.toLowerCase()}`} onClick={() => onSelect(id)} onKeyDown={activate}>
-      <rect x={x} y={y} width={width} height={height} rx="18"/>
-      <text x={center} y={y + 43} textAnchor="middle">{label}</text>
-      <text x={center} y={y + 73} textAnchor="middle" className="node-main">{main}</text>
-      {note ? <text x={center} y={y + 97} textAnchor="middle" className="node-note">{note}</text> : null}
-    </g>
   );
 }
 
 function DeliveryBars() {
   const capabilities = [
-    { label: "Format contract", value: 100, note: "Strict YAML, source digests, canonical locks, and stable diagnostics." },
-    { label: "SSR + hydration", value: 94, note: "Matching server and browser trees with an interaction-level DOM test." },
-    { label: "Dependency locks", value: 88, note: "Frozen Bun state, complete graph comparison, and target compatibility." },
-    { label: "Asset pipeline", value: 86, note: "SHA-256 names, deduplication, CSS rewriting, and remote URL reports." },
-    { label: "Isolation baseline", value: 72, note: "Cleared environment and process limits; OS sandboxing remains external." },
+    { label: "Format contract", value: 100, color: "#65e8bf", note: "Strict YAML, source digests, canonical locks, and stable diagnostics." },
+    { label: "SSR + hydration", value: 94, color: "#6bb8ff", note: "Matching server and browser trees with an interaction-level DOM test." },
+    { label: "Dependency locks", value: 88, color: "#f0bc5e", note: "Frozen Bun state, complete graph comparison, and target compatibility." },
+    { label: "Asset pipeline", value: 86, color: "#ee806f", note: "SHA-256 names, deduplication, CSS rewriting, and remote URL reports." },
+    { label: "Isolation baseline", value: 72, color: "#a98bea", note: "Cleared environment and process limits; OS sandboxing remains external." },
   ];
   const [selected, setSelected] = useState(capabilities[0] as typeof capabilities[number]);
   return (
     <figure className="delivery-card">
-      <figcaption><span>Readiness by capability</span><strong>Version-one confidence</strong></figcaption>
+      <figcaption><span>Pie Chart / imported from npm</span><strong>Version-one confidence</strong></figcaption>
+      <div className="readiness-donut">
+        <PieChart
+          data={capabilities.map((item) => ({ title: item.label, value: item.value, color: item.color }))}
+          lineWidth={22}
+          paddingAngle={2}
+          rounded
+          startAngle={-90}
+          segmentsTabIndex={0}
+          segmentsShift={(index) => capabilities[index]?.label === selected.label ? 2 : 0}
+          onClick={(_, index) => {
+            const capability = capabilities[index];
+            if (capability) setSelected(capability);
+          }}
+        />
+        <div><strong>{selected.value}%</strong><span>ready</span></div>
+      </div>
       <div className="bar-chart">
         {capabilities.map((item) => (
           <button className={`bar-row ${selected.label === item.label ? "selected" : ""}`} key={item.label} onClick={() => setSelected(item)} aria-pressed={selected.label === item.label}>
@@ -164,7 +176,7 @@ function DeliveryBars() {
         ))}
       </div>
       <div className="capability-detail" aria-live="polite"><strong>{selected.value}% / {selected.label}</strong><p>{selected.note}</p></div>
-      <p className="chart-note"><span />Select a bar to inspect its evidence.</p>
+      <p className="chart-note"><span />Select a segment or bar to inspect its evidence.</p>
     </figure>
   );
 }

@@ -32,7 +32,7 @@ function runtimePlugin(): Bun.BunPlugin {
   return {
     name: "mdxx-runtime",
     setup(builder) {
-      builder.onResolve({ filter: /^(?:react(?:-dom)?(?:\/.*)?|mermaid(?:\/.*)?)$/ }, ({ path }) => ({
+      builder.onResolve({ filter: /^react(?:-dom)?(?:\/.*)?$/ }, ({ path }) => ({
         path: Bun.resolveSync(path, import.meta.dir),
       }));
     },
@@ -161,5 +161,19 @@ export async function bundleDocument(
   const serverFiles = await readdir(serverDirectory);
   const serverFile = serverFiles.find((path) => path.endsWith(".js"));
   if (!serverFile) throw new MdxxError("BUNDLE_FAILED", "server bundle produced no JavaScript");
-  return { serverPath: join(serverDirectory, serverFile), clientJavaScript: rewriteGenerated(await javascript.text()), css };
+  let clientJavaScript = rewriteGenerated(await javascript.text());
+  if (mermaid) {
+    const mermaidPath = Bun.resolveSync("mermaid/dist/mermaid.min.js", import.meta.dir);
+    const standalone = await Bun.file(mermaidPath).text();
+    const header = '"use strict";var __esbuild_esm_mermaid_nm;';
+    if (!standalone.startsWith(header)) {
+      throw new MdxxError("BUNDLE_FAILED", "unsupported Mermaid standalone bundle format");
+    }
+    const mermaidSource = standalone.replace(
+      header,
+      '"use strict";var __esbuild_esm_mermaid_nm=globalThis.__esbuild_esm_mermaid_nm={};',
+    );
+    clientJavaScript = `${clientJavaScript}\n${mermaidSource}\n;globalThis.__mdxxMermaid=globalThis.mermaid;globalThis.__mdxxMermaid.initialize({startOnLoad:false});`;
+  }
+  return { serverPath: join(serverDirectory, serverFile), clientJavaScript, css };
 }

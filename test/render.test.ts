@@ -58,6 +58,8 @@ test("renders Mermaid fences with an opt-in browser runtime", async () => {
     const html = await Bun.file(htmlPath).text();
     expect(html).toContain('<div class="mermaid" data-mdxx-mermaid="">');
     expect(html).toContain("deterministicIDSeed");
+    expect(html).toContain("initialize({startOnLoad:false})");
+    expect(html.indexOf("Invalid mdxx HTML shell")).toBeLessThan(html.indexOf("__esbuild_esm_mermaid_nm"));
     expect(html).not.toContain('<code class="language-mermaid">');
   } finally {
     await Bun.$`rm -rf ${directory}`;

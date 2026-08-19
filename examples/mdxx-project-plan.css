@@ -69,11 +69,11 @@ ol, ul { color: #9eacb2; line-height: 1.7; }
 figure figcaption { display: flex; justify-content: space-between; gap: 20px; margin-bottom: 28px; }
 figure figcaption span { color: #71808a; font: 700 9px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
 figure figcaption strong { font: 400 16px Georgia, serif; }
-.architecture-card svg { width: 100%; height: auto; }
-.graph-node { cursor: pointer; outline: none; }.graph-node rect { fill: #111a21; stroke: #374651; transition: fill .2s, stroke .2s, stroke-width .2s; }.graph-node:hover rect, .graph-node:focus rect, .graph-node.selected rect { fill: #17252a; stroke: #65e8bf; stroke-width: 3px; }.graph-node text { pointer-events: none; fill: #6f808a; font: 700 9px ui-monospace, monospace; letter-spacing: .1em; }.graph-node .node-main { fill: #eef5f2; font: 500 14px Georgia, serif; letter-spacing: 0; }.graph-node .node-note { fill: #6f808a; font-size: 8px; letter-spacing: 0; }.graph-node.source rect { stroke: #65e8bf; }.graph-node.active rect { stroke: #6bb8ff; }.graph-node.output rect { fill: #17232a; }.flow-lines { stroke-dasharray: 6 7; }
-.graph-legend { display: flex; flex-wrap: wrap; gap: 22px; padding-top: 18px; border-top: 1px solid #27323a; color: #71808a; font: 8px ui-monospace, monospace; text-transform: uppercase; }
-.graph-legend i { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #65e8bf; }.graph-legend .legend-process { background: #6bb8ff; }.graph-legend .legend-output { background: #70808a; }
+.network-graph { width: 100%; height: auto; border: 1px solid #26343a; background: radial-gradient(circle at center, #111c22, #090f14 70%); }
+.network-graph marker path { fill: #65e8bf; }.network-link { stroke: #65e8bf; stroke-width: 2; stroke-dasharray: 6 6; opacity: .72; }
+.network-node { cursor: pointer; outline: none; }.network-node rect { fill: #111a21; stroke: #43515a; transition: fill .2s, stroke .2s, stroke-width .2s; }.network-node text { pointer-events: none; fill: #eef5f2; font: 600 11px ui-monospace, monospace; }.network-node:hover rect, .network-node:focus rect, .network-node.selected rect { fill: #17252a; stroke: #65e8bf; stroke-width: 3px; }.network-node.source rect { stroke: #65e8bf; }.network-node.compile rect { stroke: #6bb8ff; }.network-node.output rect { fill: #17232a; }
 .node-inspector { display: grid; grid-template-columns: 74px 1fr; gap: 16px; min-height: 82px; margin-top: 18px; padding: 17px; border: 1px solid #26343a; background: #0a1116; }.node-inspector span { padding-top: 4px; color: #65e8bf; font: 700 9px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }.node-inspector p { margin: 0; color: #86969d; font-size: 11px; line-height: 1.55; }
+.readiness-donut { position: relative; width: min(210px, 82%); margin: 8px auto 32px; }.readiness-donut > div { position: absolute; inset: 0; display: grid; place-content: center; pointer-events: none; text-align: center; }.readiness-donut > div strong, .readiness-donut > div span { display: block; }.readiness-donut > div strong { color: #eef5f2; font: 400 30px Georgia, serif; }.readiness-donut > div span { margin-top: 2px; color: #71808a; font: 700 8px ui-monospace, monospace; letter-spacing: .12em; text-transform: uppercase; }.readiness-donut path { cursor: pointer; outline: none; transition: opacity .2s; }.readiness-donut path:hover, .readiness-donut path:focus { opacity: .7; }
 .bar-chart { display: grid; gap: 25px; padding-top: 10px; }
 .bar-row { display: block; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }.bar-row > div:first-child { display: flex; justify-content: space-between; margin-bottom: 8px; color: #aab5ba; font-size: 10px; }.bar-row:hover > div:first-child span, .bar-row:focus > div:first-child span, .bar-row.selected > div:first-child span { color: #eef5f2; }
 .bar-row strong { color: #65e8bf; font: 700 9px ui-monospace, monospace; }.bar-track { height: 5px; background: #202a31; }.bar-track span { display: block; height: 100%; background: linear-gradient(90deg, #65e8bf, #6bb8ff); }
@@ -83,7 +83,7 @@ figure figcaption strong { font: 400 16px Georgia, serif; }
 @media (max-width: 850px) {
   .phase-explorer, .graph-grid { grid-template-columns: 1fr; }
   .graph-grid { width: 100%; margin-inline: 0; transform: none; }
-  .architecture-card { overflow-x: auto; }.architecture-card svg { min-width: 640px; }
+  .architecture-card { overflow-x: auto; }.network-graph { min-width: 640px; }
 }
 
 @media (max-width: 600px) {
