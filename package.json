@@ -1,5 +1,6 @@
 {
   "name": "mdxx",
+  "version": "1.0.0",
   "module": "src/index.ts",
   "bin": {
     "mdxx": "src/index.ts"
