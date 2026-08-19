@@ -11,6 +11,11 @@ export interface RenderBundles {
   css: string[];
 }
 
+export interface BundleDependencies {
+  directory: string;
+  mappings: Map<string, string>;
+}
+
 function entryPlugin(name: string, contents: string): Bun.BunPlugin {
   return {
     name: `mdxx-${name}`,
@@ -32,6 +37,23 @@ function runtimePlugin(): Bun.BunPlugin {
   };
 }
 
+function dependencyPlugin(dependencies?: BundleDependencies): Bun.BunPlugin {
+  return {
+    name: "mdxx-dependencies",
+    setup(builder) {
+      if (!dependencies) return;
+      builder.onResolve({ filter: /^[^.\/]|^@/ }, ({ path }) => {
+        const mapped = dependencies.mappings.get(path) ?? path;
+        try {
+          return { path: Bun.resolveSync(mapped, dependencies.directory) };
+        } catch {
+          return undefined;
+        }
+      });
+    },
+  };
+}
+
 async function assertBuild(result: Bun.BuildOutput, label: string): Promise<void> {
   if (!result.success) {
     const details = result.logs.map((log) => log.message).join("\n");
@@ -39,7 +61,11 @@ async function assertBuild(result: Bun.BuildOutput, label: string): Promise<void
   }
 }
 
-export async function bundleDocument(documentPath: string, directory: string): Promise<RenderBundles> {
+export async function bundleDocument(
+  documentPath: string,
+  directory: string,
+  dependencies?: BundleDependencies,
+): Promise<RenderBundles> {
   const serverDirectory = join(directory, "server");
   await mkdir(serverDirectory, { recursive: true });
   const server = await Bun.build({
@@ -51,7 +77,7 @@ export async function bundleDocument(documentPath: string, directory: string): P
     packages: "bundle",
     minify: false,
     sourcemap: "none",
-    plugins: [entryPlugin("mdxx-server-entry", serverEntry(documentPath)), runtimePlugin(), mdxPlugin()],
+    plugins: [entryPlugin("mdxx-server-entry", serverEntry(documentPath)), runtimePlugin(), dependencyPlugin(dependencies), mdxPlugin()],
   });
   await assertBuild(server, "server");
 
@@ -62,7 +88,7 @@ export async function bundleDocument(documentPath: string, directory: string): P
     packages: "bundle",
     minify: true,
     sourcemap: "none",
-    plugins: [entryPlugin("mdxx-client-entry", clientEntry(documentPath)), runtimePlugin(), mdxPlugin()],
+    plugins: [entryPlugin("mdxx-client-entry", clientEntry(documentPath)), runtimePlugin(), dependencyPlugin(dependencies), mdxPlugin()],
   });
   await assertBuild(client, "browser");
 

@@ -4,6 +4,7 @@ import { inspect } from "./commands/inspect.ts";
 import { unlock } from "./commands/unlock.ts";
 import { verify } from "./commands/verify.ts";
 import { build } from "./commands/build.ts";
+import { lock } from "./commands/lock.ts";
 import { canonicalJson } from "./shared/canonical-json.ts";
 import { MdxxError } from "./shared/errors.ts";
 
@@ -46,6 +47,10 @@ export async function main(args: string[]): Promise<number> {
       case "unlock":
         await unlock(path);
         console.log(`Unlocked ${path}`);
+        break;
+      case "lock":
+        await lock(path);
+        console.log(`Locked ${path}`);
         break;
       case "inspect":
         console.log(canonicalJson(await inspect(path), 2));

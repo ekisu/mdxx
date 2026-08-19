@@ -4,6 +4,7 @@ import { init } from "../src/commands/init.ts";
 import { inspect } from "../src/commands/inspect.ts";
 import { unlock } from "../src/commands/unlock.ts";
 import { verify } from "../src/commands/verify.ts";
+import { lock } from "../src/commands/lock.ts";
 import { appendEmbeddedLock } from "../src/document/embedded-lock.ts";
 import { parseDocument } from "../src/document/parse.ts";
 
@@ -22,6 +23,11 @@ test("init, inspect, verify, and unlock", async () => {
     await Bun.write(path, appendEmbeddedLock(source, { sourceDigest: digest, packages: [] }));
     await unlock(path);
     expect(await Bun.file(path).text()).toBe(source);
+
+    await lock(path);
+    const locked = parseDocument(await Bun.file(path).text());
+    expect(locked.lockFresh).toBe(true);
+    expect(locked.lock?.target).toBeDefined();
   } finally {
     await Bun.$`rm -rf ${directory}`;
   }

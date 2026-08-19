@@ -9,7 +9,9 @@ export async function inspect(path: string): Promise<Record<string, unknown>> {
     path,
     sourceDigest: document.sourceDigest,
     frontmatter: document.frontmatter,
-    lock: document.lock ? { present: true, fresh: document.lockFresh } : { present: false },
+    lock: document.lock
+      ? { present: true, fresh: document.lockFresh, target: document.lock.target, resolver: document.lock.resolver }
+      : { present: false },
     imports: graph.imports,
     packages: graph.packages,
     assets: graph.assets,
