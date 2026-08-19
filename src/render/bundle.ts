@@ -115,6 +115,7 @@ export async function bundleDocument(
     format: "esm",
     packages: "bundle",
     minify: false,
+    define: { "process.env.NODE_ENV": '"production"' },
     sourcemap: "none",
     plugins: [entryPlugin("mdxx-server-entry", serverEntry(documentPath)), runtimePlugin(), dependencyPlugin(dependencies), assetPlugin(assets), mdxPlugin(assets?.references, assets?.urls)],
   });
@@ -126,6 +127,7 @@ export async function bundleDocument(
     format: "esm",
     packages: "bundle",
     minify: true,
+    define: { "process.env.NODE_ENV": '"production"' },
     sourcemap: "none",
     plugins: [entryPlugin("mdxx-client-entry", clientEntry(documentPath)), runtimePlugin(), dependencyPlugin(dependencies), assetPlugin(assets), mdxPlugin(assets?.references, assets?.urls)],
   });

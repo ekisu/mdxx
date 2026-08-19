@@ -49,6 +49,7 @@ export async function renderInWorker(
     ? [limiter, "--cpu=15", "--", process.execPath, serverPath]
     : [process.execPath, serverPath];
   const child = Bun.spawn(grouped ? [grouped, ...renderCommand] : renderCommand, {
+    cwd: process.platform === "win32" ? undefined : "/",
     env: { LANG: "C.UTF-8", LC_ALL: "C.UTF-8", TZ: "UTC" },
     stdin: "pipe",
     stdout: "pipe",

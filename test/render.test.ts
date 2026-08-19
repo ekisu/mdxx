@@ -94,6 +94,17 @@ test("does not inherit undeclared environment variables", async () => {
   }
 }, 30_000);
 
+test("rejects nondeterministic server markup", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "random.mdx");
+  try {
+    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n{crypto.randomUUID()}\n");
+    await expect(build(document, { output: join(directory, "output") })).rejects.toThrow("different markup");
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
 test("times out a stuck render subprocess", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const worker = join(directory, "stuck.js");

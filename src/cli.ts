@@ -78,6 +78,6 @@ export async function main(args: string[]): Promise<number> {
     return 0;
   } catch (error) {
     console.error(formatError(error));
-    return 1;
+    return error instanceof MdxxError && error.code === "USAGE" ? 2 : 1;
   }
 }
