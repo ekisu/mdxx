@@ -30,6 +30,8 @@ describe("import discovery", () => {
     expect(discoverImports("document.mdx", "import fs from 'node:fs'\n\n# no")).rejects.toThrow("built-in import");
     expect(discoverImports("document.mdx", "export const x = import('./x.ts')\n\n# no")).rejects.toThrow("dynamic imports");
     expect(discoverImports("document.mdx", "import x from 'https://example.test/x.js'\n\n# no")).rejects.toThrow("remote code");
+    expect(discoverImports("document.mdx", "export const x = require('node:fs')\n\n# no")).rejects.toThrow("CommonJS require");
+    expect(discoverImports("document.mdx", "import x from '/tmp/x.js'\n\n# no")).rejects.toThrow("absolute import");
   });
 });
 

@@ -7,6 +7,7 @@ export interface AssetReference {
   specifier: string;
   resolved?: string;
   remote: boolean;
+  imported: boolean;
 }
 
 export interface AssetDiscovery {
@@ -20,11 +21,34 @@ function staticUrls(source: string, extension: string): string[] {
   const values: string[] = [];
   const patterns = extension === ".css"
     ? [/@import\s+(?:url\()?\s*["']([^"']+)["']\s*\)?/g, /url\(\s*["']?([^"')]+)["']?\s*\)/g]
-    : [/!\[[^\]]*\]\((?:<)?([^\s)>]+)(?:>)?(?:\s+["'][^"']*["'])?\)/g, /\b(?:src|poster)\s*=\s*["']([^"']+)["']/g];
+    : [
+        /!\[[^\]]*\]\(\s*<([^>]+)>[^)]*\)/g,
+        /!\[[^\]]*\]\(\s*([^\s)>]+)(?:\s+["'][^"']*["'])?\s*\)/g,
+        /\b(?:src|poster)\s*=\s*["']([^"']+)["']/g,
+        /\b(?:src|poster)\s*=\s*\{\s*["']([^"']+)["']\s*\}/g,
+      ];
   for (const pattern of patterns) {
     for (const match of source.matchAll(pattern)) {
       const value = match[1];
       if (value) values.push(value);
+    }
+  }
+  if (extension !== ".css") {
+    const definitions = new Map<string, string>();
+    for (const match of source.matchAll(/^\s*\[([^\]]+)\]:\s*(?:<([^>]+)>|(\S+))/gm)) {
+      const label = match[1]?.toLowerCase();
+      const url = match[2] ?? match[3];
+      if (label && url) definitions.set(label, url);
+    }
+    for (const match of source.matchAll(/!\[[^\]]*\]\[([^\]]+)\]/g)) {
+      const value = match[1] ? definitions.get(match[1].toLowerCase()) : undefined;
+      if (value) values.push(value);
+    }
+    for (const match of source.matchAll(/\bsrcSet\s*=\s*["']([^"']+)["']/g)) {
+      for (const candidate of (match[1] ?? "").split(",")) {
+        const value = candidate.trim().split(/\s+/, 1)[0];
+        if (value) values.push(value);
+      }
     }
   }
   return values;
@@ -37,7 +61,7 @@ function ignoredUrl(value: string): boolean {
 export async function discoverAssets(documentPath: string, mdxBody: string, graph: ImportGraph): Promise<AssetDiscovery> {
   const references: AssetReference[] = graph.imports
     .filter((item) => (item.kind === "asset" || item.kind === "style") && item.resolved)
-    .map((item) => ({ importer: item.importer, specifier: item.specifier, resolved: item.resolved, remote: false }));
+    .map((item) => ({ importer: item.importer, specifier: item.specifier, resolved: item.resolved, remote: false, imported: true }));
   const files = new Set(graph.assets);
   const styles = new Set(graph.styles);
   const pending = [resolve(documentPath), ...graph.modules.filter((path) => resolve(path) !== resolve(documentPath)), ...graph.styles];
@@ -53,7 +77,7 @@ export async function discoverAssets(documentPath: string, mdxBody: string, grap
     for (const specifier of staticUrls(source, extension)) {
       if (/^https?:\/\//.test(specifier)) {
         remoteUrls.add(specifier);
-        references.push({ importer: path, specifier, remote: true });
+        references.push({ importer: path, specifier, remote: true, imported: false });
         continue;
       }
       if (ignoredUrl(specifier)) continue;
@@ -61,7 +85,7 @@ export async function discoverAssets(documentPath: string, mdxBody: string, grap
       if (!(await Bun.file(resolved).exists())) {
         throw new MdxxError("MISSING_LOCAL_ASSET", `cannot resolve asset ${specifier} from ${path}`);
       }
-      references.push({ importer: path, specifier, resolved, remote: false });
+      references.push({ importer: path, specifier, resolved, remote: false, imported: false });
       if (extname(resolved).toLowerCase() === ".css") {
         styles.add(resolved);
         pending.push(resolved);

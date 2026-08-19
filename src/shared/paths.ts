@@ -10,14 +10,21 @@ export async function readDocument(path: string): Promise<string> {
 
 export async function atomicWrite(path: string, contents: string | Uint8Array): Promise<void> {
   const temporary = `${path}.mdxx-${process.pid}-${crypto.randomUUID()}.tmp`;
-  await Bun.write(temporary, contents);
   try {
+    await Bun.write(temporary, contents);
     await Bun.file(temporary).exists();
     await import("node:fs/promises").then(({ rename }) => rename(temporary, path));
   } catch (error) {
     await import("node:fs/promises").then(({ rm }) => rm(temporary, { force: true }));
     throw error;
   }
+}
+
+export async function atomicWriteIfUnchanged(path: string, expected: string, contents: string): Promise<void> {
+  if (await readDocument(path) !== expected) {
+    throw new MdxxError("CONCURRENT_MODIFICATION", `document changed while the command was running: ${path}`);
+  }
+  await atomicWrite(path, contents);
 }
 
 export async function pathExists(path: string): Promise<boolean> {

@@ -44,7 +44,11 @@ export async function renderInWorker(
 ): Promise<string> {
   const token = `@mdxx-result-${crypto.randomUUID()}@`;
   const grouped = process.platform !== "win32" ? Bun.which("setsid") : null;
-  const child = Bun.spawn(grouped ? [grouped, process.execPath, serverPath] : [process.execPath, serverPath], {
+  const limiter = process.platform === "linux" ? Bun.which("prlimit") : null;
+  const renderCommand = limiter
+    ? [limiter, "--cpu=15", "--", process.execPath, serverPath]
+    : [process.execPath, serverPath];
+  const child = Bun.spawn(grouped ? [grouped, ...renderCommand] : renderCommand, {
     env: { LANG: "C.UTF-8", LC_ALL: "C.UTF-8", TZ: "UTC" },
     stdin: "pipe",
     stdout: "pipe",

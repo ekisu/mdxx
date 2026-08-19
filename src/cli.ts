@@ -12,6 +12,8 @@ import { MdxxError } from "./shared/errors.ts";
 const USAGE = "Usage: mdxx <init|run|build|lock|unlock|verify|inspect> [options] <document.mdx>";
 
 function documentArgument(args: string[]): string {
+  const unknown = args.find((argument) => argument.startsWith("-"));
+  if (unknown) throw new MdxxError("USAGE", `unknown option: ${unknown}`);
   const paths = args.filter((argument) => !argument.startsWith("-"));
   if (paths.length !== 1) throw new MdxxError("USAGE", USAGE);
   return paths[0] as string;
@@ -39,6 +41,8 @@ export async function main(args: string[]): Promise<number> {
     const lockedIndex = rest.indexOf("--locked");
     const locked = lockedIndex >= 0;
     if (locked) rest.splice(lockedIndex, 1);
+    if (output !== undefined && command !== "build") throw new MdxxError("USAGE", "--output is only valid for build");
+    if (locked && command !== "build" && command !== "run") throw new MdxxError("USAGE", "--locked is only valid for build and run");
     const path = documentArgument(rest);
     switch (command) {
       case "init":

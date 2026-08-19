@@ -28,6 +28,9 @@ function collectSpecifiers(root: unknown): string[] {
     if (node.type === "ImportExpression" || (node.type === "CallExpression" && node.callee?.type === "Import")) {
       throw new MdxxError("FORBIDDEN_IMPORT", "dynamic imports are not supported");
     }
+    if (node.type === "CallExpression" && node.callee?.type === "Identifier" && (node.callee as { name?: string }).name === "require") {
+      throw new MdxxError("FORBIDDEN_IMPORT", "CommonJS require is not supported");
+    }
     for (const child of Object.values(node)) {
       if (Array.isArray(child)) stack.push(...child);
       else if (child !== null && typeof child === "object") stack.push(child);
@@ -83,7 +86,10 @@ export async function discoverImports(documentPath: string, mdxBody: string): Pr
       if (isBuiltinSpecifier(specifier)) {
         throw new MdxxError("FORBIDDEN_IMPORT", `built-in import is not supported: ${specifier}`);
       }
-      if (specifier.startsWith(".") || specifier.startsWith("/")) {
+      if (specifier.startsWith("/")) {
+        throw new MdxxError("FORBIDDEN_IMPORT", `absolute import is not supported: ${specifier}`);
+      }
+      if (specifier.startsWith(".")) {
         const resolved = await resolveLocalModule(current.path, specifier);
         if (!resolved) throw new MdxxError("MISSING_LOCAL_FILE", `cannot resolve ${specifier} from ${current.path}`);
         const kind = extname(resolved).toLowerCase() === ".css" ? "style" : isCodePath(resolved) ? "module" : "asset";

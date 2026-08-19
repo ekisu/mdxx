@@ -12,7 +12,14 @@ export async function inspect(path: string): Promise<Record<string, unknown>> {
     sourceDigest: document.sourceDigest,
     frontmatter: document.frontmatter,
     lock: document.lock
-      ? { present: true, fresh: document.lockFresh, target: document.lock.target, resolver: document.lock.resolver }
+      ? {
+          present: true,
+          fresh: document.lockFresh,
+          target: document.lock.target,
+          resolver: document.lock.resolver,
+          roots: document.lock.roots,
+          packages: document.lock.packages,
+        }
       : { present: false },
     imports: graph.imports,
     packages: graph.packages,

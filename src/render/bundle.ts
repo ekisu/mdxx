@@ -1,10 +1,11 @@
 import { mkdir, readdir } from "node:fs/promises";
-import { join } from "node:path";
+import { basename, extname, join } from "node:path";
 import { MdxxError } from "../shared/errors.ts";
 import { clientEntry } from "./client-entry.ts";
 import { mdxPlugin } from "./compile.ts";
 import { serverEntry } from "./server-entry.ts";
 import type { EmittedAssets } from "../assets/emit.ts";
+import { sha256 } from "../shared/digest.ts";
 
 export interface RenderBundles {
   serverPath: string;
@@ -43,9 +44,11 @@ function dependencyPlugin(dependencies?: BundleDependencies): Bun.BunPlugin {
     name: "mdxx-dependencies",
     setup(builder) {
       if (!dependencies) return;
-      builder.onResolve({ filter: /^[^.\/]|^@/ }, ({ path }) => {
+      builder.onResolve({ filter: /^[^.\/]|^@/ }, ({ path, importer }) => {
         if (path.includes(":")) return undefined;
-        const mapped = dependencies.mappings.get(path) ?? path;
+        if (importer.startsWith(dependencies.directory)) return undefined;
+        const mapped = dependencies.mappings.get(path);
+        if (!mapped) return undefined;
         try {
           return { path: Bun.resolveSync(mapped, dependencies.directory) };
         } catch {
@@ -100,6 +103,7 @@ export async function bundleDocument(
   directory: string,
   dependencies?: BundleDependencies,
   assets?: EmittedAssets,
+  generatedAssetDirectory?: string,
 ): Promise<RenderBundles> {
   const serverDirectory = join(directory, "server");
   await mkdir(serverDirectory, { recursive: true });
@@ -130,10 +134,29 @@ export async function bundleDocument(
   const javascript = client.outputs.find((output) => output.path.endsWith(".js"));
   if (!javascript) throw new MdxxError("BUNDLE_FAILED", "browser bundle produced no JavaScript");
   const cssOutputs = client.outputs.filter((output) => output.path.endsWith(".css"));
-  const css = await Promise.all(cssOutputs.map(async (output) => (await output.text()).replaceAll("https://mdxx.invalid/", "")));
+  const generated = client.outputs.filter((output) => !output.path.endsWith(".js") && !output.path.endsWith(".css"));
+  const rewrites = new Map<string, string>();
+  if (generated.length > 0) {
+    if (!generatedAssetDirectory) throw new MdxxError("BUNDLE_FAILED", "bundle emitted assets without an output directory");
+    await mkdir(generatedAssetDirectory, { recursive: true });
+    for (const output of generated) {
+      const bytes = new Uint8Array(await output.arrayBuffer());
+      const extension = extname(output.path).toLowerCase();
+      const stem = basename(output.path, extension).replace(/-[A-Za-z0-9]+$/, "").replace(/[^A-Za-z0-9._-]+/g, "-") || "asset";
+      const name = `${stem}.${sha256(bytes).slice(7, 23)}${extension}`;
+      await Bun.write(join(generatedAssetDirectory, name), bytes);
+      rewrites.set(basename(output.path), `assets/${name}`);
+    }
+  }
+  const rewriteGenerated = (source: string): string => {
+    let result = source.replaceAll("https://mdxx.invalid/", "");
+    for (const [from, to] of rewrites) result = result.replaceAll(from, to);
+    return result;
+  };
+  const css = await Promise.all(cssOutputs.map(async (output) => rewriteGenerated(await output.text())));
 
   const serverFiles = await readdir(serverDirectory);
   const serverFile = serverFiles.find((path) => path.endsWith(".js"));
   if (!serverFile) throw new MdxxError("BUNDLE_FAILED", "server bundle produced no JavaScript");
-  return { serverPath: join(serverDirectory, serverFile), clientJavaScript: await javascript.text(), css };
+  return { serverPath: join(serverDirectory, serverFile), clientJavaScript: rewriteGenerated(await javascript.text()), css };
 }

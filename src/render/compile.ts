@@ -7,9 +7,15 @@ import { transpileMdxEsm } from "../document/typescript.ts";
 function rewriteReferences(path: string, source: string, references: AssetReference[], urls: Map<string, string>): string {
   let result = source;
   for (const reference of references) {
-    if (reference.importer !== path || !reference.resolved) continue;
+    if (reference.importer !== path || !reference.resolved || reference.imported) continue;
     const url = urls.get(reference.resolved);
-    if (url) result = result.replaceAll(reference.specifier, url);
+    if (!url) continue;
+    const escaped = reference.specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    result = result
+      .replace(new RegExp(`(\\]\\(\\s*<?)${escaped}(>?)(?=[\\s)])`, "g"), `$1${url}$2`)
+      .replace(new RegExp(`((?:src|poster|srcSet)\\s*=\\s*["'])${escaped}(["'])`, "g"), `$1${url}$2`)
+      .replace(new RegExp(`((?:src|poster)\\s*=\\s*\\{\\s*["'])${escaped}(["']\\s*\\})`, "g"), `$1${url}$2`)
+      .replace(new RegExp(`(^\\s*\\[[^\\]]+\\]:\\s*<?)${escaped}(>?)`, "gm"), `$1${url}$2`);
   }
   return result;
 }

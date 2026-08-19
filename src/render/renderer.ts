@@ -12,10 +12,11 @@ export async function renderDocument(
   metadata: Record<string, unknown>,
   dependencies?: BundleDependencies,
   assets?: EmittedAssets,
+  generatedAssetDirectory?: string,
 ): Promise<string> {
   const temporary = await mkdtemp(join(tmpdir(), "mdxx-render-"));
   try {
-    const bundles = await bundleDocument(documentPath, temporary, dependencies, assets);
+    const bundles = await bundleDocument(documentPath, temporary, dependencies, assets, generatedAssetDirectory);
     const markup = await renderInWorker(bundles.serverPath, metadata);
     return createHtml({ markup, metadata, clientJavaScript: bundles.clientJavaScript, css: bundles.css });
   } finally {

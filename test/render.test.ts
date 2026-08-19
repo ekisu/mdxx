@@ -64,6 +64,36 @@ export function Metric({label, value}: MetricProps) {
   }
 }, 30_000);
 
+test("renders a relative TSX component from a path with spaces and Unicode", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "path with space-\u00e5.mdx");
+  try {
+    await Bun.write(join(directory, "Relative.tsx"), "export function Relative({value}: {value: string}) { return <mark>{value}</mark> }\n");
+    await Bun.write(
+      document,
+      "---\nmdxx:\n  format: 1\n---\n\nimport {Relative} from './Relative.tsx'\n\n<Relative value=\"relative\" />\n",
+    );
+    const htmlPath = await build(document, { output: join(directory, "output with space") });
+    expect(await Bun.file(htmlPath).text()).toContain("<mark>relative</mark>");
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
+test("does not inherit undeclared environment variables", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "environment.mdx");
+  process.env.MDXX_TEST_SECRET = "inherited";
+  try {
+    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n{process.env.MDXX_TEST_SECRET ?? 'clear'}\n");
+    const htmlPath = await build(document, { output: join(directory, "output") });
+    expect(await Bun.file(htmlPath).text()).toContain(">clear<");
+  } finally {
+    delete process.env.MDXX_TEST_SECRET;
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
 test("times out a stuck render subprocess", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const worker = join(directory, "stuck.js");
@@ -103,22 +133,44 @@ mdxx:
 ---
 
 import './style.css'
+import logo from './one.png'
 
 ![One](./one.png)
 
 <img src="./two.png" />
 
+<img src={logo} />
+
 ![Remote](https://example.test/image.png)
 `,
     );
-    const htmlPath = await build(document, { output: join(directory, "output") });
+    const warnings: string[] = [];
+    const htmlPath = await build(document, { output: join(directory, "output"), onWarning: (message) => warnings.push(message) });
     const html = await Bun.file(htmlPath).text();
     const files = await Array.fromAsync(new Bun.Glob("assets/*").scan({ cwd: join(directory, "output") }));
     expect(files).toHaveLength(1);
-    expect(files[0]).toMatch(/^assets\/one\.[0-9a-f]{8}\.png$/);
-    expect(html.match(/assets\/one\.[0-9a-f]{8}\.png/g)?.length).toBeGreaterThanOrEqual(3);
+    expect(files[0]).toMatch(/^assets\/one\.[0-9a-f]{16}\.png$/);
+    expect(html.match(/assets\/one\.[0-9a-f]{16}\.png/g)?.length).toBeGreaterThanOrEqual(4);
     expect(html).toContain("https://example.test/image.png");
     expect(html).toContain("color:#010203");
+    expect(warnings).toEqual(["mdxx: remote asset is mutable: https://example.test/image.png"]);
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
+test("rewrites spaced and reference-style Markdown assets", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "references.mdx");
+  try {
+    await Bun.write(join(directory, "my image.png"), "spaced asset");
+    await Bun.write(
+      document,
+      "---\nmdxx:\n  format: 1\n---\n\n![Angle](<./my image.png>)\n\n![Reference][image]\n\n[image]: <./my image.png>\n",
+    );
+    const htmlPath = await build(document, { output: join(directory, "output") });
+    const html = await Bun.file(htmlPath).text();
+    expect(html.match(/assets\/my-image\.[0-9a-f]{16}\.png/g)?.length).toBeGreaterThanOrEqual(2);
   } finally {
     await Bun.$`rm -rf ${directory}`;
   }

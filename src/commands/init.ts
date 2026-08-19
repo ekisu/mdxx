@@ -1,4 +1,6 @@
 import { MdxxError } from "../shared/errors.ts";
+import { mkdir, open } from "node:fs/promises";
+import { dirname } from "node:path";
 
 const INITIAL_DOCUMENT = `---
 mdxx:
@@ -9,6 +11,19 @@ mdxx:
 `;
 
 export async function init(path: string): Promise<void> {
-  if (await Bun.file(path).exists()) throw new MdxxError("ALREADY_EXISTS", `refusing to overwrite ${path}`);
-  await Bun.write(path, INITIAL_DOCUMENT, { createPath: true });
+  await mkdir(dirname(path), { recursive: true });
+  let file;
+  try {
+    file = await open(path, "wx");
+  } catch (cause) {
+    if ((cause as NodeJS.ErrnoException).code === "EEXIST") {
+      throw new MdxxError("ALREADY_EXISTS", `refusing to overwrite ${path}`);
+    }
+    throw cause;
+  }
+  try {
+    await file.writeFile(INITIAL_DOCUMENT);
+  } finally {
+    await file.close();
+  }
 }
