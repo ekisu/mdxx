@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type KeyboardEvent } from "react";
 
 interface Phase {
   id: string;
@@ -80,6 +80,14 @@ export function PhaseExplorer() {
 }
 
 function ArchitectureGraph() {
+  const descriptions: Record<string, string> = {
+    source: "The authored MDX, strict frontmatter, local modules, and asset references form the declared source graph.",
+    validate: "Discovery rejects forbidden imports and checks lock freshness before any document code executes.",
+    compile: "One pinned MDX and Bun pipeline creates matching server and browser module graphs.",
+    server: "A cleared-environment subprocess renders deterministic initial markup twice and compares it.",
+    browser: "The inlined client bundle hydrates the same component tree and activates interactions.",
+  };
+  const [selected, setSelected] = useState("compile");
   return (
     <figure className="architecture-card">
       <figcaption><span>Execution model</span><strong>One pipeline, two bundles</strong></figcaption>
@@ -90,18 +98,20 @@ function ArchitectureGraph() {
           <filter id="glow"><feGaussianBlur stdDeviation="5" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
         </defs>
         <g className="flow-lines" fill="none" stroke="url(#flow)" strokeWidth="3"><path d="M170 165 H265"/><path d="M405 165 H470"/><path d="M610 135 H680 V72"/><path d="M610 195 H680 V258"/></g>
-        <GraphNode className="source" x={20} y={105} width={150} height={120} label="SOURCE" main="document.mdx" note="frontmatter + code" />
-        <GraphNode x={265} y={105} width={140} height={120} label="VALIDATE" main="graph + lock" note="reject undeclared input" />
-        <GraphNode className="active" x={470} y={105} width={140} height={120} label="COMPILE" main="Bun + MDX" note="shared module graph" glow />
-        <GraphNode className="output" x={620} y={20} width={120} height={84} label="SERVER" main="SSR" />
-        <GraphNode className="output" x={620} y={226} width={120} height={84} label="BROWSER" main="hydrate" />
+        <GraphNode id="source" selected={selected === "source"} onSelect={setSelected} className="source" x={20} y={105} width={150} height={120} label="SOURCE" main="document.mdx" note="frontmatter + code" />
+        <GraphNode id="validate" selected={selected === "validate"} onSelect={setSelected} x={265} y={105} width={140} height={120} label="VALIDATE" main="graph + lock" note="reject undeclared input" />
+        <GraphNode id="compile" selected={selected === "compile"} onSelect={setSelected} className="active" x={470} y={105} width={140} height={120} label="COMPILE" main="Bun + MDX" note="shared module graph" glow />
+        <GraphNode id="server" selected={selected === "server"} onSelect={setSelected} className="output" x={620} y={20} width={120} height={84} label="SERVER" main="SSR" />
+        <GraphNode id="browser" selected={selected === "browser"} onSelect={setSelected} className="output" x={620} y={226} width={120} height={84} label="BROWSER" main="hydrate" />
       </svg>
       <div className="graph-legend"><span><i className="legend-source"/>authored input</span><span><i className="legend-process"/>deterministic process</span><span><i className="legend-output"/>generated output</span></div>
+      <div className="node-inspector" aria-live="polite"><span>{selected}</span><p>{descriptions[selected]}</p></div>
     </figure>
   );
 }
 
 interface GraphNodeProps {
+  id: string;
   x: number;
   y: number;
   width: number;
@@ -111,12 +121,20 @@ interface GraphNodeProps {
   note?: string;
   className?: string;
   glow?: boolean;
+  selected: boolean;
+  onSelect: (id: string) => void;
 }
 
-function GraphNode({ x, y, width, height, label, main, note, className = "", glow = false }: GraphNodeProps) {
+function GraphNode({ id, x, y, width, height, label, main, note, className = "", glow = false, selected, onSelect }: GraphNodeProps) {
   const center = x + width / 2;
+  const activate = (event: KeyboardEvent<SVGGElement>) => {
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onSelect(id);
+    }
+  };
   return (
-    <g className={`graph-node ${className}`} filter={glow ? "url(#glow)" : undefined}>
+    <g className={`graph-node ${className} ${selected ? "selected" : ""}`} filter={glow ? "url(#glow)" : undefined} role="button" tabIndex={0} aria-label={`Inspect ${label.toLowerCase()}`} onClick={() => onSelect(id)} onKeyDown={activate}>
       <rect x={x} y={y} width={width} height={height} rx="18"/>
       <text x={center} y={y + 43} textAnchor="middle">{label}</text>
       <text x={center} y={y + 73} textAnchor="middle" className="node-main">{main}</text>
@@ -127,24 +145,26 @@ function GraphNode({ x, y, width, height, label, main, note, className = "", glo
 
 function DeliveryBars() {
   const capabilities = [
-    { label: "Format contract", value: 100 },
-    { label: "SSR + hydration", value: 94 },
-    { label: "Dependency locks", value: 88 },
-    { label: "Asset pipeline", value: 86 },
-    { label: "Isolation baseline", value: 72 },
+    { label: "Format contract", value: 100, note: "Strict YAML, source digests, canonical locks, and stable diagnostics." },
+    { label: "SSR + hydration", value: 94, note: "Matching server and browser trees with an interaction-level DOM test." },
+    { label: "Dependency locks", value: 88, note: "Frozen Bun state, complete graph comparison, and target compatibility." },
+    { label: "Asset pipeline", value: 86, note: "SHA-256 names, deduplication, CSS rewriting, and remote URL reports." },
+    { label: "Isolation baseline", value: 72, note: "Cleared environment and process limits; OS sandboxing remains external." },
   ];
+  const [selected, setSelected] = useState(capabilities[0] as typeof capabilities[number]);
   return (
     <figure className="delivery-card">
       <figcaption><span>Readiness by capability</span><strong>Version-one confidence</strong></figcaption>
       <div className="bar-chart">
         {capabilities.map((item) => (
-          <div className="bar-row" key={item.label}>
+          <button className={`bar-row ${selected.label === item.label ? "selected" : ""}`} key={item.label} onClick={() => setSelected(item)} aria-pressed={selected.label === item.label}>
             <div><span>{item.label}</span><strong>{item.value}</strong></div>
             <div className="bar-track"><span style={{ width: `${item.value}%` }} /></div>
-          </div>
+          </button>
         ))}
       </div>
-      <p className="chart-note"><span />Target: every release claim backed by a fixture.</p>
+      <div className="capability-detail" aria-live="polite"><strong>{selected.value}% / {selected.label}</strong><p>{selected.note}</p></div>
+      <p className="chart-note"><span />Select a bar to inspect its evidence.</p>
     </figure>
   );
 }

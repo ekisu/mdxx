@@ -52,6 +52,26 @@ Select a delivery phase to inspect its exit criteria.
 
 Discovery feeds both dependency resolution and rendering. `build` and `run` share the exact same output path, preventing a second development-only contract from emerging.
 
+### Mermaid: the dependency flow
+
+This graph is authored as a plain `mermaid` code fence. mdxx keeps the source readable and initializes the diagram after React hydration.
+
+```mermaid
+flowchart LR
+  MDX[document.mdx] --> Scan[Discover graph]
+  Scan --> Lock{Current lock?}
+  Lock -->|yes| Frozen[Frozen install]
+  Lock -->|no| Resolve[Resolve packages]
+  Frozen --> Bundle[Server + browser bundles]
+  Resolve --> Bundle
+  Bundle --> SSR[Deterministic SSR]
+  SSR --> HTML[Interactive HTML]
+```
+
+### React: inspect the renderer
+
+The graphs below are React components. Select pipeline nodes and readiness bars to reveal live details.
+
 <SystemGraphs />
 
 ---

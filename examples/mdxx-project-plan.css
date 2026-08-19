@@ -40,6 +40,8 @@ ol, ul { color: #9eacb2; line-height: 1.7; }
 #mdxx-root > ol > li { position: relative; margin: 0; padding: 28px 20px 28px 62px; border-top: 1px solid #2d3840; counter-increment: risks; }
 #mdxx-root > ol > li::before { content: "0" counter(risks); position: absolute; left: 12px; top: 32px; color: #65e8bf; font: 700 10px ui-monospace, monospace; }
 #mdxx-root > ol > li > p { margin-bottom: 0; }
+.mermaid { min-height: 280px; margin: 42px 0; padding: 28px; overflow-x: auto; border: 1px solid #2c3740; border-radius: 3px; background: linear-gradient(145deg, #0d151b, #101a20); color: #82919a; white-space: pre; font: 12px/1.6 ui-monospace, monospace; }
+.mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
 
 .phase-explorer { display: grid; grid-template-columns: .82fr 1.18fr; gap: 48px; margin: 54px 0 20px; }
 .phase-tabs { display: flex; flex-direction: column; }
@@ -68,12 +70,14 @@ figure figcaption { display: flex; justify-content: space-between; gap: 20px; ma
 figure figcaption span { color: #71808a; font: 700 9px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }
 figure figcaption strong { font: 400 16px Georgia, serif; }
 .architecture-card svg { width: 100%; height: auto; }
-.graph-node rect { fill: #111a21; stroke: #374651; }.graph-node text { fill: #6f808a; font: 700 9px ui-monospace, monospace; letter-spacing: .1em; }.graph-node .node-main { fill: #eef5f2; font: 500 14px Georgia, serif; letter-spacing: 0; }.graph-node .node-note { fill: #6f808a; font-size: 8px; letter-spacing: 0; }.graph-node.source rect { stroke: #65e8bf; }.graph-node.active rect { stroke: #6bb8ff; }.graph-node.output rect { fill: #17232a; }.flow-lines { stroke-dasharray: 6 7; }
+.graph-node { cursor: pointer; outline: none; }.graph-node rect { fill: #111a21; stroke: #374651; transition: fill .2s, stroke .2s, stroke-width .2s; }.graph-node:hover rect, .graph-node:focus rect, .graph-node.selected rect { fill: #17252a; stroke: #65e8bf; stroke-width: 3px; }.graph-node text { pointer-events: none; fill: #6f808a; font: 700 9px ui-monospace, monospace; letter-spacing: .1em; }.graph-node .node-main { fill: #eef5f2; font: 500 14px Georgia, serif; letter-spacing: 0; }.graph-node .node-note { fill: #6f808a; font-size: 8px; letter-spacing: 0; }.graph-node.source rect { stroke: #65e8bf; }.graph-node.active rect { stroke: #6bb8ff; }.graph-node.output rect { fill: #17232a; }.flow-lines { stroke-dasharray: 6 7; }
 .graph-legend { display: flex; flex-wrap: wrap; gap: 22px; padding-top: 18px; border-top: 1px solid #27323a; color: #71808a; font: 8px ui-monospace, monospace; text-transform: uppercase; }
 .graph-legend i { display: inline-block; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: #65e8bf; }.graph-legend .legend-process { background: #6bb8ff; }.graph-legend .legend-output { background: #70808a; }
+.node-inspector { display: grid; grid-template-columns: 74px 1fr; gap: 16px; min-height: 82px; margin-top: 18px; padding: 17px; border: 1px solid #26343a; background: #0a1116; }.node-inspector span { padding-top: 4px; color: #65e8bf; font: 700 9px ui-monospace, monospace; letter-spacing: .1em; text-transform: uppercase; }.node-inspector p { margin: 0; color: #86969d; font-size: 11px; line-height: 1.55; }
 .bar-chart { display: grid; gap: 25px; padding-top: 10px; }
-.bar-row > div:first-child { display: flex; justify-content: space-between; margin-bottom: 8px; color: #aab5ba; font-size: 10px; }
+.bar-row { display: block; width: 100%; padding: 0; border: 0; background: transparent; color: inherit; text-align: left; cursor: pointer; }.bar-row > div:first-child { display: flex; justify-content: space-between; margin-bottom: 8px; color: #aab5ba; font-size: 10px; }.bar-row:hover > div:first-child span, .bar-row:focus > div:first-child span, .bar-row.selected > div:first-child span { color: #eef5f2; }
 .bar-row strong { color: #65e8bf; font: 700 9px ui-monospace, monospace; }.bar-track { height: 5px; background: #202a31; }.bar-track span { display: block; height: 100%; background: linear-gradient(90deg, #65e8bf, #6bb8ff); }
+.capability-detail { min-height: 105px; margin-top: 30px; padding: 17px; border: 1px solid #26343a; background: #0a1116; }.capability-detail strong { color: #65e8bf; font: 700 9px ui-monospace, monospace; text-transform: uppercase; }.capability-detail p { margin: 10px 0 0; color: #86969d; font-size: 10px; line-height: 1.55; }
 .chart-note { margin: 38px 0 0; padding-top: 18px; border-top: 1px solid #27323a; color: #71808a; font-size: 9px; }.chart-note span { display: inline-block; width: 6px; height: 6px; margin-right: 7px; border-radius: 50%; background: #65e8bf; }
 
 @media (max-width: 850px) {

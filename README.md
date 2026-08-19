@@ -33,6 +33,15 @@ mdxx:
 
 JavaScript and TypeScript components can be declared inline or imported from relative modules. Bare npm imports are resolved in an isolated generated project; local images and CSS are content-addressed in the build output.
 
+GitHub Flavored Markdown is supported, including tables and task lists. Mermaid diagrams use ordinary fenced code blocks and are rendered in the browser after hydration:
+
+````markdown
+```mermaid
+flowchart LR
+  Source --> Build --> HTML
+```
+````
+
 ## Commands
 
 ```text

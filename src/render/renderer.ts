@@ -14,10 +14,11 @@ export async function renderDocument(
   dependencies?: BundleDependencies,
   assets?: EmittedAssets,
   generatedAssetDirectory?: string,
+  mermaid = false,
 ): Promise<string> {
   const temporary = await mkdtemp(join(tmpdir(), "mdxx-render-"));
   try {
-    const bundles = await bundleDocument(documentPath, temporary, dependencies, assets, generatedAssetDirectory);
+    const bundles = await bundleDocument(documentPath, temporary, dependencies, assets, generatedAssetDirectory, mermaid);
     const markup = await renderInWorker(bundles.serverPath, metadata);
     const repeatedMarkup = await renderInWorker(bundles.serverPath, metadata);
     if (markup !== repeatedMarkup) {

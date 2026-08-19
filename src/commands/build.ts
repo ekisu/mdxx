@@ -8,6 +8,7 @@ import { MdxxError } from "../shared/errors.ts";
 import { pathExists, readDocument } from "../shared/paths.ts";
 import { discoverAssets } from "../assets/discover.ts";
 import { emitAssets } from "../assets/emit.ts";
+import { containsMermaid } from "../render/mermaid.ts";
 
 export interface BuildOptions {
   output: string;
@@ -35,7 +36,14 @@ export async function build(path: string, options: BuildOptions): Promise<string
     await mkdir(parent, { recursive: true });
     await mkdir(staging);
     const emitted = await emitAssets(assets, join(staging, "assets"));
-    const html = await renderDocument(documentPath, document.metadata, prepared.environment, emitted, join(staging, "assets"));
+    const html = await renderDocument(
+      documentPath,
+      document.metadata,
+      prepared.environment,
+      emitted,
+      join(staging, "assets"),
+      containsMermaid(document.body),
+    );
     const name = basename(documentPath, extname(documentPath));
     await Bun.write(join(staging, `${name}.html`), html);
     await rename(staging, output);

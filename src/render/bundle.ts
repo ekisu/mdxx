@@ -32,7 +32,7 @@ function runtimePlugin(): Bun.BunPlugin {
   return {
     name: "mdxx-runtime",
     setup(builder) {
-      builder.onResolve({ filter: /^react(?:-dom)?(?:\/.*)?$/ }, ({ path }) => ({
+      builder.onResolve({ filter: /^(?:react(?:-dom)?(?:\/.*)?|mermaid(?:\/.*)?)$/ }, ({ path }) => ({
         path: Bun.resolveSync(path, import.meta.dir),
       }));
     },
@@ -104,6 +104,7 @@ export async function bundleDocument(
   dependencies?: BundleDependencies,
   assets?: EmittedAssets,
   generatedAssetDirectory?: string,
+  mermaid = false,
 ): Promise<RenderBundles> {
   const serverDirectory = join(directory, "server");
   await mkdir(serverDirectory, { recursive: true });
@@ -129,7 +130,7 @@ export async function bundleDocument(
     minify: true,
     define: { "process.env.NODE_ENV": '"production"' },
     sourcemap: "none",
-    plugins: [entryPlugin("mdxx-client-entry", clientEntry(documentPath)), runtimePlugin(), dependencyPlugin(dependencies), assetPlugin(assets), mdxPlugin(assets?.references, assets?.urls)],
+    plugins: [entryPlugin("mdxx-client-entry", clientEntry(documentPath, mermaid)), runtimePlugin(), dependencyPlugin(dependencies), assetPlugin(assets), mdxPlugin(assets?.references, assets?.urls)],
   });
   await assertBuild(client, "browser");
 

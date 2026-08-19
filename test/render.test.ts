@@ -28,6 +28,7 @@ export function Greeting({name}) { return <strong>Hello {name}</strong> }
     expect(first).toContain("<h1>Heading</h1>");
     expect(first).toContain("<strong>Hello <!-- -->world</strong>");
     expect(first).toContain('<script type="module">');
+    expect(first).not.toContain("deterministicIDSeed");
     expect(first).not.toContain(directory);
   } finally {
     await Bun.$`rm -rf ${directory}`;
@@ -43,6 +44,21 @@ test("renders GFM tables as semantic Markdown", async () => {
     const html = await Bun.file(htmlPath).text();
     expect(html).toContain("<table>");
     expect(html).toContain('<th style="text-align:right">Proof</th>');
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
+test("renders Mermaid fences with an opt-in browser runtime", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "diagram.mdx");
+  try {
+    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n```mermaid\nflowchart LR\n  Source --> HTML\n```\n");
+    const htmlPath = await build(document, { output: join(directory, "output") });
+    const html = await Bun.file(htmlPath).text();
+    expect(html).toContain('<div class="mermaid" data-mdxx-mermaid="">');
+    expect(html).toContain("deterministicIDSeed");
+    expect(html).not.toContain('<code class="language-mermaid">');
   } finally {
     await Bun.$`rm -rf ${directory}`;
   }
