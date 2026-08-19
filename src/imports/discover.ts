@@ -7,30 +7,53 @@ import type { ImportGraph, ImportReference } from "./graph.ts";
 import { isBuiltinSpecifier, parsePackageSpecifier, type PackageSpecifier } from "./specifier.ts";
 import { transpileMdxEsm } from "../document/typescript.ts";
 import remarkGfm from "remark-gfm";
+import { normalizeInlineStyles } from "../document/inline-style.ts";
 
 interface SyntaxNode {
   type?: string;
   source?: { value?: unknown };
-  callee?: { type?: string };
-  arguments?: Array<{ type?: string; value?: unknown }>;
+  callee?: SyntaxNode;
+  arguments?: SyntaxNode[];
+  name?: string;
+  value?: unknown;
   [key: string]: unknown;
 }
 
-function collectSpecifiers(root: unknown): string[] {
-  const specifiers: string[] = [];
+interface DiscoveredSpecifier {
+  value: string;
+  worker: boolean;
+}
+
+function collectSpecifiers(root: unknown): DiscoveredSpecifier[] {
+  const specifiers: DiscoveredSpecifier[] = [];
   const stack: unknown[] = [root];
   while (stack.length > 0) {
     const value = stack.pop();
     if (value === null || typeof value !== "object") continue;
     const node = value as SyntaxNode;
     if (["ImportDeclaration", "ExportNamedDeclaration", "ExportAllDeclaration"].includes(node.type ?? "")) {
-      if (typeof node.source?.value === "string") specifiers.push(node.source.value);
+      if (typeof node.source?.value === "string") specifiers.push({ value: node.source.value, worker: false });
     }
-    if (node.type === "ImportExpression" || (node.type === "CallExpression" && node.callee?.type === "Import")) {
-      throw new MdxxError("FORBIDDEN_IMPORT", "dynamic imports are not supported");
+    if (node.type === "ImportExpression") {
+      if (typeof node.source?.value !== "string") throw new MdxxError("FORBIDDEN_IMPORT", "computed dynamic imports are not supported");
+      specifiers.push({ value: node.source.value, worker: false });
+    }
+    if (node.type === "CallExpression" && node.callee?.type === "Import") {
+      const argument = node.arguments?.[0];
+      if (argument?.type !== "StringLiteral" || typeof argument.value !== "string") {
+        throw new MdxxError("FORBIDDEN_IMPORT", "computed dynamic imports are not supported");
+      }
+      specifiers.push({ value: argument.value, worker: false });
     }
     if (node.type === "CallExpression" && node.callee?.type === "Identifier" && (node.callee as { name?: string }).name === "require") {
       throw new MdxxError("FORBIDDEN_IMPORT", "CommonJS require is not supported");
+    }
+    if (node.type === "NewExpression" && node.callee?.type === "Identifier" && ["Worker", "SharedWorker"].includes(node.callee.name ?? "")) {
+      const url = node.arguments?.[0];
+      const argument = url?.type === "NewExpression" && url.callee?.name === "URL" ? url.arguments?.[0] : undefined;
+      if (argument?.type === "StringLiteral" && typeof argument.value === "string" && argument.value.startsWith(".")) {
+        specifiers.push({ value: argument.value, worker: true });
+      }
     }
     for (const child of Object.values(node)) {
       if (Array.isArray(child)) stack.push(...child);
@@ -40,10 +63,10 @@ function collectSpecifiers(root: unknown): string[] {
   return specifiers;
 }
 
-async function parseModule(path: string, mdxBody?: string): Promise<string[]> {
+async function parseModule(path: string, mdxBody?: string): Promise<DiscoveredSpecifier[]> {
   let code: string;
   if (mdxBody !== undefined || extname(path).toLowerCase() === ".mdx") {
-    const source = transpileMdxEsm(mdxBody ?? (await Bun.file(path).text()), path);
+    const source = normalizeInlineStyles(transpileMdxEsm(mdxBody ?? (await Bun.file(path).text()), path));
     try {
       code = String(await compile(
         { value: source, path },
@@ -83,7 +106,8 @@ export async function discoverImports(documentPath: string, mdxBody: string): Pr
     if (!current || visited.has(current.path)) continue;
     visited.add(current.path);
 
-    for (const specifier of await parseModule(current.path, current.body)) {
+    for (const discovered of await parseModule(current.path, current.body)) {
+      const specifier = discovered.value;
       if (/^https?:\/\//.test(specifier)) {
         throw new MdxxError("FORBIDDEN_IMPORT", `remote code import is not supported: ${specifier}`);
       }
@@ -96,9 +120,9 @@ export async function discoverImports(documentPath: string, mdxBody: string): Pr
       if (specifier.startsWith(".")) {
         const resolved = await resolveLocalModule(current.path, specifier);
         if (!resolved) throw new MdxxError("MISSING_LOCAL_FILE", `cannot resolve ${specifier} from ${current.path}`);
-        const kind = extname(resolved).toLowerCase() === ".css" ? "style" : isCodePath(resolved) ? "module" : "asset";
+        const kind = discovered.worker ? "worker" : extname(resolved).toLowerCase() === ".css" ? "style" : isCodePath(resolved) ? "module" : "asset";
         imports.push({ importer: current.path, specifier, kind, resolved });
-        if (kind === "module") pending.push({ path: resolved });
+        if (kind === "module" || kind === "worker") pending.push({ path: resolved });
         else if (kind === "style") styles.add(resolved);
         else assets.add(resolved);
         continue;

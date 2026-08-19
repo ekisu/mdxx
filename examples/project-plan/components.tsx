@@ -27,8 +27,8 @@ const phases: Phase[] = [
     window: "Weeks 3-4",
     progress: 92,
     tone: "sky",
-    summary: "Authored MDX becomes server-rendered, interactive HTML.",
-    outcomes: ["Typed inline components", "SSR in a worker subprocess", "Browser hydration and CSS bundling"],
+    summary: "Authored MDX becomes an interactive browser application.",
+    outcomes: ["Typed inline components", "Client-only mounting", "Browser chunks and CSS bundling"],
   },
   {
     id: "supply-chain",

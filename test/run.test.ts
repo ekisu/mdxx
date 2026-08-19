@@ -12,7 +12,8 @@ test("serves a temporary build on loopback", async () => {
       expect(new URL(session.url).hostname).toBe("127.0.0.1");
       const response = await fetch(session.url);
       expect(response.status).toBe(200);
-      expect(await response.text()).toContain("<h1>Served</h1>");
+      expect(await response.text()).toContain('<main id="mdxx-root"></main>');
+      expect(response.headers.get("x-content-type-options")).toBe("nosniff");
       expect((await fetch(new URL("../outside", session.url))).status).toBe(404);
     } finally {
       await session.close();

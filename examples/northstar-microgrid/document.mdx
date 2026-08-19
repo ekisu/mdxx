@@ -1,0 +1,84 @@
+---
+title: Northstar Island / Microgrid Commissioning Dossier
+description: Interactive operating evidence for a fictional island energy network.
+mdxx:
+  format: 1
+  requires: ">=1 <2"
+---
+
+import {NetworkTopology, DispatchChart, EnergyAnalytics, ResilienceLab} from './components.tsx'
+import './styles.css'
+
+**NSI-04** · Commissioning dossier · Rev. 08 / verified
+
+# Power after the *last ferry.*
+
+Northstar Island's new microgrid must carry a hospital, desalination plant, harbor, and 1,840 homes through the long winter night. This document turns seven days of commissioning evidence into an explorable operating decision.
+
+**● Network synchronized.** Island mode available.
+
+| Renewable coverage | Battery autonomy | Peak demand | Loss-of-load risk |
+| ---: | ---: | ---: | ---: |
+| **81.6%** | **13.8 h** | **3.84 MW** | **0.31%** |
+| +6.2 vs design | Critical load | 18:42 Friday | Within threshold |
+
+## One bus, three promises.
+
+**01 / Network.** Select equipment to inspect witnessed commissioning evidence.
+
+<NetworkTopology />
+
+## The difficult hour is visible.
+
+**02 / Dispatch.** Solar carries the day. Storage absorbs the ramp between production falling and the harbor waking up.
+
+<DispatchChart />
+
+## Seven days in two views.
+
+The energy ledger accounts for every delivered unit. The operational stress matrix shows when reserve intervention becomes likely.
+
+<EnergyAnalytics />
+
+---
+
+## The operating question
+
+The system is not being judged on its best solar afternoon. It is being judged on **04:00 after two overcast days**, when the desalination pumps start and the hospital cannot notice the transition from battery to backup generation.
+
+> **Commissioning threshold**
+>
+> Maintain all critical services with a loss-of-load probability below **0.5%**, while keeping annual diesel generation under **8%** of delivered energy.
+
+## Evidence, not optimism
+
+The topology above is the as-commissioned network. The dispatch trace combines inverter telemetry, feeder meters, and the battery management system at five-minute resolution. Select equipment, hours, and heatmap cells to inspect where the design has margin and where it does not.
+
+| Evidence window | Samples | Peak demand | Renewable share |
+| --- | ---: | ---: | ---: |
+| 08–14 February | **12,096** | **3.84 MW** | **81.6%** |
+| Worst two-hour ramp | **17:10–19:10** | **+1.12 MW** | **43.2%** |
+| Longest island run | **31.4 h** | **3.31 MW** | **76.8%** |
+
+---
+
+## Break the weather
+
+The resilience model is intentionally loaded as a separate browser chunk. It runs seeded scenarios in a dedicated Worker, leaving the report responsive while it combines cloud persistence, battery availability, demand growth, and generator start risk.
+
+<ResilienceLab />
+
+---
+
+## Commissioning decision
+
+1. **Accept the electrical topology.** Protection coordination, black-start sequencing, and critical feeder transfer all passed witnessed tests.
+2. **Add 1.2 MWh before winter year three.** Demand growth erodes the low-cloud reserve faster than the current operating plan acknowledges.
+3. **Move desalination into the solar shoulder.** A two-hour schedule change removes the sharpest evening ramp without reducing water output.
+4. **Retain generator G-02 through the first winter.** It contributes little annual energy but materially lowers tail risk during maintenance on battery bank B.
+
+> The network is ready to enter service. Its next constraint is not generation capacity; it is when flexible demand chooses to run.
+
+---
+
+**Northstar Energy Office** · Field evidence / local fixture data · NSI-04-R08

@@ -6,6 +6,8 @@ import { lock } from "../src/commands/lock.ts";
 import { parseDocument } from "../src/document/parse.ts";
 import { appendEmbeddedLock, type EmbeddedLock } from "../src/document/embedded-lock.ts";
 import { verify } from "../src/commands/verify.ts";
+import { prepareDependencies } from "../src/dependencies/resolve.ts";
+import { parsePackageSpecifier } from "../src/imports/specifier.ts";
 
 test("parses Bun package tuples into a stable internal graph", () => {
   const packages = parseBunLock(`{
@@ -46,10 +48,14 @@ import escape from 'escape-html@1.0.3'
 `,
     );
     await lock(document);
-    const htmlPath = await build(document, { output: join(directory, "output"), locked: true });
-    expect(await Bun.file(htmlPath).text()).toContain("&amp;lt;locked&amp;gt;");
+    await build(document, { output: join(directory, "output"), locked: true });
+    const entry = (await Array.fromAsync(new Bun.Glob("assets/client-*.js").scan({ cwd: join(directory, "output") })))[0];
+    expect(entry).toBeDefined();
+    expect(await Bun.file(join(directory, "output", entry!)).text()).toContain('"<locked>"');
 
     const parsed = parseDocument(await Bun.file(document).text());
+    expect(parsed.lock?.react).toEqual({ react: "19.2.8", reactDom: "19.2.8" });
+    expect(Array.isArray(parsed.lock?.peers)).toBe(true);
     const tampered = structuredClone(parsed.lock) as EmbeddedLock;
     const firstPackage = (tampered.packages as Array<Record<string, unknown>>)[0];
     if (!firstPackage) throw new Error("expected a locked package");
@@ -69,9 +75,17 @@ test("processes CSS from a versioned package subpath", async () => {
       document,
       "---\nmdxx:\n  format: 1\n---\n\nimport 'normalize.css@8.0.1/normalize.css'\n\n# Styled\n",
     );
-    const htmlPath = await build(document, { output: join(directory, "output") });
-    expect(await Bun.file(htmlPath).text()).toContain("line-height:1.15");
+    await build(document, { output: join(directory, "output") });
+    const css = (await Array.fromAsync(new Bun.Glob("assets/*.css").scan({ cwd: join(directory, "output") })))[0];
+    expect(css).toBeDefined();
+    expect(await Bun.file(join(directory, "output", css!)).text()).toContain("line-height:1.15");
   } finally {
     await Bun.$`rm -rf ${directory}`;
   }
+}, 30_000);
+
+test("rejects package peers incompatible with the selected React runtime", async () => {
+  await expect(prepareDependencies([parsePackageSpecifier("react-test-renderer@16.14.0")])).rejects.toThrow(
+    "requires react ^16.14.0, but mdxx selected 19.2.8",
+  );
 }, 30_000);

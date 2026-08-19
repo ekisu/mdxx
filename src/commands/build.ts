@@ -8,7 +8,6 @@ import { MdxxError } from "../shared/errors.ts";
 import { pathExists, readDocument } from "../shared/paths.ts";
 import { discoverAssets } from "../assets/discover.ts";
 import { emitAssets } from "../assets/emit.ts";
-import { containsMermaid } from "../render/mermaid.ts";
 
 export interface BuildOptions {
   output: string;
@@ -40,9 +39,10 @@ export async function build(path: string, options: BuildOptions): Promise<string
       documentPath,
       document.metadata,
       prepared.environment,
+      [...graph.modules, ...assets.styles],
+      graph.imports.filter((item) => item.kind === "worker" && item.resolved).map((item) => item.resolved!),
       emitted,
       join(staging, "assets"),
-      containsMermaid(document.body),
     );
     const name = basename(documentPath, extname(documentPath));
     await Bun.write(join(staging, `${name}.html`), html);

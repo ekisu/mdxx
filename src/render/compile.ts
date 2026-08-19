@@ -4,7 +4,7 @@ import { MdxxError } from "../shared/errors.ts";
 import type { AssetReference } from "../assets/discover.ts";
 import { transpileMdxEsm } from "../document/typescript.ts";
 import remarkGfm from "remark-gfm";
-import { rehypeMermaid } from "./mermaid.ts";
+import { normalizeInlineStyles } from "../document/inline-style.ts";
 
 function rewriteReferences(path: string, source: string, references: AssetReference[], urls: Map<string, string>): string {
   let result = source;
@@ -31,7 +31,7 @@ export async function compileMdx(
   let document;
   try {
     document = parseDocument(source);
-    document.body = transpileMdxEsm(rewriteReferences(path, document.body, references, urls), path);
+    document.body = normalizeInlineStyles(transpileMdxEsm(rewriteReferences(path, document.body, references, urls), path));
   } catch (cause) {
     throw new MdxxError("INVALID_MDX", `could not parse ${path}`, { cause });
   }
@@ -46,7 +46,6 @@ export async function compileMdx(
           jsxImportSource: "react",
           development: false,
           remarkPlugins: [remarkGfm],
-          rehypePlugins: [rehypeMermaid],
         },
       ),
     );

@@ -8,9 +8,10 @@ This document describes the initial file format and rendering contract for a CLI
 
 - Keep documents recognizable as ordinary MDX.
 - Make arbitrary React components easy to import and use.
+- Prioritize local, interactive visualization and broad browser-package compatibility.
 - Treat ordinary package imports as dependency declarations.
 - Allow, but do not require, a complete dependency lock.
-- Produce deterministic HTML when all declared inputs are unchanged.
+- Produce deterministic build artifacts when all declared inputs are unchanged.
 - Keep local and remote assets outside the dependency capsule.
 - Avoid requiring custom package import syntax.
 
@@ -19,7 +20,9 @@ This document describes the initial file format and rendering contract for a CLI
 - Guarantee that mutable remote assets render identically over time.
 - Make unlocked transitive dependency resolution reproducible.
 - Embed local assets or dependency package contents in every MDX file.
-- Safely execute untrusted components in the CLI process.
+- Make untrusted browser component code safe without an external sandbox.
+- Produce server-rendered document content or useful output without JavaScript.
+- Guarantee that the browser-rendered DOM is identical across browsers or machines.
 
 ## Document Format
 
@@ -99,6 +102,8 @@ import {Preview} from '@acme/preview@next'
 
 Exact versions select one release. Semver ranges select a compatible release, and npm tags select the release currently referenced by that tag. The embedded lock records the exact selected version in all three cases. Scoped package selectors are parsed after the package name, as shown above, and a package subpath follows the selector.
 
+Version selectors are authoring syntax rather than runtime module names. mdxx records each selector in the generated dependency manifest and rewrites the compiled import to the corresponding standard package name without modifying the authored source.
+
 Relative imports refer to local modules and are treated as local build inputs.
 
 In unlocked mode, an unresolved bare import is resolved from the configured package registry and cached without modifying the authored source. The optional embedded lock records the selected version and complete transitive graph. Node built-ins are not packages and remain subject to the security policy.
@@ -132,7 +137,7 @@ Unlocked execution follows Bun's auto-install model:
 1. Discover bare package imports in the MDX and local module graph.
 2. Resolve missing packages in an isolated package environment.
 3. Store downloaded packages in a shared content cache.
-4. Compile and render the MDX using that environment.
+4. Compile and bundle the MDX using that environment.
 
 The cache is an optimization, not part of the document's reproducibility contract.
 
@@ -237,12 +242,14 @@ same mdxx version
 + same MDX source excluding the generated lock
 + same resolved dependency graph
 + same local asset bytes
-= same generated HTML and copied asset names
+= same generated HTML, bundled code, and copied asset names
 ```
 
 An embedded lock makes the resolved dependency graph portable. Without one, package imports may resolve differently over time.
 
 Remote asset content is deliberately outside this contract. Its URL affects generated HTML; the bytes served by that URL affect only the later visual rendering.
+
+The reproducibility contract covers generated artifacts, not the DOM produced when their JavaScript runs. Browser versions, viewport dimensions, graphics drivers, user input, current time, randomness, network responses, and browser storage may affect a component at runtime. Components that need reproducible visual output must control those inputs themselves.
 
 Deterministic generation also requires:
 
@@ -256,18 +263,25 @@ Deterministic generation also requires:
 
 ## Rendering
 
-The initial renderer compiles JavaScript or TypeScript MDX, server-renders the initial React markup, and bundles the client runtime needed to hydrate it. TypeScript is transpiled without type-checking during rendering; a separate validation command may report type errors. The mdxx major version defines the MDX compiler, TypeScript transform, React runtime, HTML serializer, bundler, and module resolution behavior so those implementation packages do not need to be repeated in each document.
+The initial renderer compiles JavaScript or TypeScript MDX into a client application and mounts it in the browser. It does not import or execute document modules to produce initial HTML. TypeScript is transpiled without type-checking during the build; a separate validation command may report type errors.
+
+The mdxx major version defines the MDX compiler, TypeScript transform, React runtime, HTML serializer, bundler, and module resolution behavior. The selected React and React DOM versions are materialized as explicit dependencies in the generated document application so package peer dependencies resolve through a conventional dependency tree. They are part of the resolved build graph even though authors do not need to declare them separately.
 
 The initial and default `interactive` profile:
 
-- Produces server-rendered HTML with bundled client-side JavaScript for hydration.
+- Produces a deterministic HTML shell with bundled client-side JavaScript.
+- Mounts the document with a client React root rather than hydrating server markup.
 - Bundles component code and the runtime into the generated HTML.
 - Inlines generated component CSS when practical.
 - Rewrites local asset references to copied, content-addressed files.
 - Preserves remote asset URLs.
-- Requires components to tolerate server rendering for the initial markup; browser-only behavior may start after hydration.
+- Executes document and component code only in the browser.
+- Does not require components to support server rendering.
+- Embeds frontmatter metadata as canonical data for the client entry.
 
-A `static` profile that omits client-side JavaScript may be added later for documents that do not need interaction.
+The built HTML requires JavaScript to display document content. The shell should include a concise `noscript` explanation, but no fallback rendering is required.
+
+Server-rendered and static profiles may be added later for documents that value initial markup or JavaScript-free output over maximum component compatibility. They are separate renderer profiles and must not constrain the package compatibility of the default client-only profile.
 
 ## Open Questions
 
@@ -292,7 +306,7 @@ export const layout = ReportLayout
 Report content.
 ```
 
-After compiling the MDX module, the renderer would read both its generated default content component and the conventional named export, then conceptually render:
+After compiling the MDX module, the client entry would read both its generated default content component and the conventional named export, then conceptually mount:
 
 ```tsx
 const {default: Content, layout: Layout} = compiledModule
@@ -306,21 +320,15 @@ The ordinary import keeps template discovery, auto-installation, version selecti
 
 This option would still need to define the conventional export name, layout props, head contribution mechanism, and behavior when no layout is exported. The example illustrates the mechanism rather than deciding those details.
 
-A likely separation is to use CSS imports for styling and an optional template only for document-shell concerns such as `<html>`, head metadata, navigation, and content framing. Before choosing an API, the renderer design must establish how a template receives frontmatter, rendered content, head contributions, and hydration state without creating a second component model.
+A likely separation is to use CSS imports for styling and an optional template only for document-shell concerns such as `<html>`, head metadata, navigation, and content framing. Before choosing an API, the renderer design must establish how a template receives frontmatter, document content, head contributions, and client mount state without creating a second component model.
 
 ## Security
 
-MDX and arbitrary components execute JavaScript. Rendering must not evaluate untrusted content in the main CLI process.
+MDX and arbitrary components execute JavaScript in the browser. The build must parse, transform, and bundle document modules without evaluating them in the CLI process. Dependency installation must continue to ignore package lifecycle scripts.
 
-The renderer should run in an isolated worker or subprocess with:
+`mdxx run` serves the generated application on loopback, but loopback is not a security boundary. Document code has the normal authority of browser JavaScript on that origin: it may use browser storage, make network requests allowed by the browser, consume CPU and memory, and inspect content exposed on the page. Untrusted documents should be opened in a dedicated browser profile or stronger external sandbox.
 
-- No inherited secrets or undeclared environment variables.
-- No network access after dependency resolution by default.
-- Read-only access to declared source and asset inputs.
-- No access to unrelated filesystem paths.
-- CPU, memory, and execution time limits.
-
-Node built-ins, dynamic imports, and computed module specifiers should be rejected initially unless an explicit permission model is introduced.
+Node built-ins, remote code imports, CommonJS `require`, and computed module specifiers remain forbidden in authored document code. Static dynamic imports may be supported when the bundler can include their complete output graph deterministically; unresolved or computed dynamic imports remain forbidden.
 
 ## Initial CLI
 
@@ -351,8 +359,8 @@ The first version should support:
 - Standard bare and relative imports.
 - npm package resolution with a shared cache.
 - Optional embedded dependency locks.
-- Interactive HTML rendering with server-rendered initial markup and hydration.
+- Client-only interactive HTML rendering with broad browser-component compatibility.
 - External local assets with deterministic copied names.
 - Directly linked remote assets.
 
-A static rendering profile, remote module imports, online remote-asset verification, and a component permission system are deferred until the interactive format and renderer are stable.
+Server-rendered and static rendering profiles, remote module imports, online remote-asset verification, and a component permission system are deferred until the client-only interactive format and renderer are stable.

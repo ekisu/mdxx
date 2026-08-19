@@ -24,7 +24,13 @@ export async function startRun(path: string, locked = false): Promise<RunSession
         if (filePath !== root && !filePath.startsWith(`${root}${sep}`)) return new Response("Not found", { status: 404 });
         const file = Bun.file(filePath);
         if (!(await file.exists())) return new Response("Not found", { status: 404 });
-        return new Response(file);
+        return new Response(file, {
+          headers: {
+            "Cross-Origin-Opener-Policy": "same-origin",
+            "Referrer-Policy": "no-referrer",
+            "X-Content-Type-Options": "nosniff",
+          },
+        });
       },
     });
     let closed = false;

@@ -1,3 +1,5 @@
+import { canonicalJson } from "../shared/canonical-json.ts";
+
 function escapeHtml(value: string): string {
   return value.replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;");
 }
@@ -10,28 +12,28 @@ function scriptSafe(value: string): string {
 }
 
 export interface HtmlInput {
-  markup: string;
   metadata: Record<string, unknown>;
-  clientJavaScript: string;
-  css: string[];
+  scripts: string[];
+  styles: string[];
 }
 
-export function createHtml({ markup, metadata, clientJavaScript, css }: HtmlInput): string {
+export function createHtml({ metadata, scripts, styles }: HtmlInput): string {
   const title = typeof metadata.title === "string" ? metadata.title : "mdxx document";
-  const styles = css.map((style) => `<style>${style.replaceAll("</style", "<\\/style")}</style>`).join("\n");
-  const data = scriptSafe(JSON.stringify({ metadata }));
-  const script = clientJavaScript.replace(/<\/script/gi, "<\\/script");
+  const links = styles.map((href) => `<link rel="stylesheet" href="${escapeHtml(href)}">`).join("\n");
+  const data = scriptSafe(canonicalJson({ metadata }));
+  const entries = scripts.map((src) => `<script type="module" src="${escapeHtml(src)}"></script>`).join("\n");
   return `<!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>${escapeHtml(title)}</title>${styles ? `\n${styles}` : ""}
+<title>${escapeHtml(title)}</title>${links ? `\n${links}` : ""}
 </head>
 <body>
-<main id="mdxx-root">${markup}</main>
+<main id="mdxx-root"></main>
+<noscript>This interactive visualization requires JavaScript.</noscript>
 <script id="mdxx-data" type="application/json">${data}</script>
-<script type="module">${script}</script>
+${entries}
 </body>
 </html>
 `;

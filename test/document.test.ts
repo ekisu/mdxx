@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { appendEmbeddedLock, extractEmbeddedLock, serializeEmbeddedLock } from "../src/document/embedded-lock.ts";
 import { parseDocument } from "../src/document/parse.ts";
+import { normalizeInlineStyles } from "../src/document/inline-style.ts";
 
 const source = `---
 title: Example
@@ -12,6 +13,13 @@ mdxx:
 `;
 
 describe("document parsing", () => {
+  test("normalizes raw style blocks without changing JSX expressions", () => {
+    expect(normalizeInlineStyles("<style media=\"screen\">body { margin: 0; }</style>")).toBe(
+      '<style media="screen">{"body { margin: 0; }"}</style>',
+    );
+    expect(normalizeInlineStyles("<style>{styles}</style>")).toBe("<style>{styles}</style>");
+  });
+
   test("parses metadata and defaults interactive rendering", () => {
     const parsed = parseDocument(source);
     expect(parsed.metadata).toEqual({ title: "Example" });

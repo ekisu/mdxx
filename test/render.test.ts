@@ -1,219 +1,73 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { build } from "../src/commands/build.ts";
-import { renderInWorker } from "../src/render/worker.ts";
 
-test("builds deterministic server-rendered and hydratable HTML", async () => {
+test("builds a deterministic client-only HTML shell", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const document = join(directory, "hello.mdx");
-  const source = `---
-title: Render test
-mdxx:
-  format: 1
----
-
-export function Greeting({name}) { return <strong>Hello {name}</strong> }
-
-# Heading
-
-<Greeting name="world" />
-`;
   try {
-    await Bun.write(document, source);
+    await Bun.write(document, "---\ntitle: Render test\nmdxx:\n  format: 1\n---\n\n# Heading\n");
     const firstPath = await build(document, { output: join(directory, "first") });
     const secondPath = await build(document, { output: join(directory, "second") });
     const first = await Bun.file(firstPath).text();
     const second = await Bun.file(secondPath).text();
     expect(first).toBe(second);
-    expect(first).toContain("<h1>Heading</h1>");
-    expect(first).toContain("<strong>Hello <!-- -->world</strong>");
-    expect(first).toContain('<script type="module">');
-    expect(first).not.toContain("deterministicIDSeed");
+    expect(first).toContain('<main id="mdxx-root"></main>');
+    expect(first).toContain("requires JavaScript");
+    expect(first).toContain('<script id="mdxx-data" type="application/json">');
+    expect(first).toMatch(/<script type="module" src="assets\/client-[a-z0-9]+\.js"><\/script>/);
+    expect(first).not.toContain("<h1>Heading</h1>");
     expect(first).not.toContain(directory);
   } finally {
     await Bun.$`rm -rf ${directory}`;
   }
 }, 30_000);
 
-test("renders GFM tables as semantic Markdown", async () => {
+test("does not execute document code while building", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
-  const document = join(directory, "table.mdx");
+  const document = join(directory, "browser-only.mdx");
   try {
-    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n| Track | Proof |\n| --- | ---: |\n| Format | 100 |\n");
-    const htmlPath = await build(document, { output: join(directory, "output") });
-    const html = await Bun.file(htmlPath).text();
-    expect(html).toContain("<table>");
-    expect(html).toContain('<th style="text-align:right">Proof</th>');
+    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n{(() => { throw new Error('browser runtime only') })()}\n");
+    const outputPath = await build(document, { output: join(directory, "output") });
+    expect(await Bun.file(outputPath).exists()).toBe(true);
   } finally {
     await Bun.$`rm -rf ${directory}`;
   }
 }, 30_000);
 
-test("renders Mermaid fences with an opt-in browser runtime", async () => {
+test("keeps Mermaid fences as ordinary code", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const document = join(directory, "diagram.mdx");
   try {
     await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n```mermaid\nflowchart LR\n  Source --> HTML\n```\n");
-    const htmlPath = await build(document, { output: join(directory, "output") });
-    const html = await Bun.file(htmlPath).text();
-    expect(html).toContain('<div class="mermaid" data-mdxx-mermaid="">');
-    expect(html).toContain("deterministicIDSeed");
-    expect(html).toContain("initialize({startOnLoad:false})");
-    expect(html.indexOf("Invalid mdxx HTML shell")).toBeLessThan(html.indexOf("__esbuild_esm_mermaid_nm"));
-    expect(html).not.toContain('<code class="language-mermaid">');
+    await build(document, { output: join(directory, "output") });
+    const entry = (await Array.fromAsync(new Bun.Glob("assets/client-*.js").scan({ cwd: join(directory, "output") })))[0];
+    expect(entry).toBeDefined();
+    expect(await Bun.file(join(directory, "output", entry!)).text()).toContain("language-mermaid");
   } finally {
     await Bun.$`rm -rf ${directory}`;
   }
 }, 30_000);
 
-test("renders an inline typed TSX component", async () => {
-  const directory = (await Bun.$`mktemp -d`.text()).trim();
-  const document = join(directory, "typed.mdx");
-  try {
-    await Bun.write(
-      document,
-      `---
-mdxx:
-  format: 1
----
-
-export interface MetricProps {
-  label: string
-  value: number
-}
-export function Metric({label, value}: MetricProps) {
-  return <section><strong>{value}</strong><span>{label}</span></section>
-}
-
-<Metric label="Downloads" value={12400} />
-`,
-    );
-    const htmlPath = await build(document, { output: join(directory, "output") });
-    const html = await Bun.file(htmlPath).text();
-    expect(html).toContain("<strong>12400</strong><span>Downloads</span>");
-  } finally {
-    await Bun.$`rm -rf ${directory}`;
-  }
-}, 30_000);
-
-test("renders a relative TSX component from a path with spaces and Unicode", async () => {
-  const directory = (await Bun.$`mktemp -d`.text()).trim();
-  const document = join(directory, "path with space-\u00e5.mdx");
-  try {
-    await Bun.write(join(directory, "Relative.tsx"), "export function Relative({value}: {value: string}) { return <mark>{value}</mark> }\n");
-    await Bun.write(
-      document,
-      "---\nmdxx:\n  format: 1\n---\n\nimport {Relative} from './Relative.tsx'\n\n<Relative value=\"relative\" />\n",
-    );
-    const htmlPath = await build(document, { output: join(directory, "output with space") });
-    expect(await Bun.file(htmlPath).text()).toContain("<mark>relative</mark>");
-  } finally {
-    await Bun.$`rm -rf ${directory}`;
-  }
-}, 30_000);
-
-test("does not inherit undeclared environment variables", async () => {
-  const directory = (await Bun.$`mktemp -d`.text()).trim();
-  const document = join(directory, "environment.mdx");
-  process.env.MDXX_TEST_SECRET = "inherited";
-  try {
-    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n{process.env.MDXX_TEST_SECRET ?? 'clear'}\n");
-    const htmlPath = await build(document, { output: join(directory, "output") });
-    expect(await Bun.file(htmlPath).text()).toContain(">clear<");
-  } finally {
-    delete process.env.MDXX_TEST_SECRET;
-    await Bun.$`rm -rf ${directory}`;
-  }
-}, 30_000);
-
-test("rejects nondeterministic server markup", async () => {
-  const directory = (await Bun.$`mktemp -d`.text()).trim();
-  const document = join(directory, "random.mdx");
-  try {
-    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n{crypto.randomUUID()}\n");
-    await expect(build(document, { output: join(directory, "output") })).rejects.toThrow("different markup");
-  } finally {
-    await Bun.$`rm -rf ${directory}`;
-  }
-}, 30_000);
-
-test("times out a stuck render subprocess", async () => {
-  const directory = (await Bun.$`mktemp -d`.text()).trim();
-  const worker = join(directory, "stuck.js");
-  try {
-    await Bun.write(worker, "while (true) {}\n");
-    await expect(renderInWorker(worker, {}, 50)).rejects.toThrow("render exceeded 50ms");
-  } finally {
-    await Bun.$`rm -rf ${directory}`;
-  }
-}, 5_000);
-
-test("leaves no partial output after a runtime failure", async () => {
-  const directory = (await Bun.$`mktemp -d`.text()).trim();
-  const document = join(directory, "failure.mdx");
-  const output = join(directory, "output");
-  try {
-    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n{(() => { throw new Error('render boom') })()}\n");
-    await expect(build(document, { output })).rejects.toThrow("render boom");
-    expect(await Bun.file(output).exists()).toBe(false);
-  } finally {
-    await Bun.$`rm -rf ${directory}`;
-  }
-}, 30_000);
-
-test("hashes, deduplicates, and rewrites local assets and CSS", async () => {
+test("mounts relative typed TSX and emits local assets and CSS", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const document = join(directory, "assets.mdx");
   try {
-    await Bun.write(join(directory, "one.png"), "same bytes");
-    await Bun.write(join(directory, "two.png"), "same bytes");
+    await Bun.write(join(directory, "Component.tsx"), "export const Component = () => <mark>relative</mark>\n");
+    await Bun.write(join(directory, "one.png"), "asset bytes");
     await Bun.write(join(directory, "style.css"), ".hero { background: url('./one.png'); color: rgb(1, 2, 3); }");
     await Bun.write(
       document,
-      `---
-mdxx:
-  format: 1
----
-
-import './style.css'
-import logo from './one.png'
-
-![One](./one.png)
-
-<img src="./two.png" />
-
-<img src={logo} />
-
-![Remote](https://example.test/image.png)
-`,
-    );
-    const warnings: string[] = [];
-    const htmlPath = await build(document, { output: join(directory, "output"), onWarning: (message) => warnings.push(message) });
-    const html = await Bun.file(htmlPath).text();
-    const files = await Array.fromAsync(new Bun.Glob("assets/*").scan({ cwd: join(directory, "output") }));
-    expect(files).toHaveLength(1);
-    expect(files[0]).toMatch(/^assets\/one\.[0-9a-f]{16}\.png$/);
-    expect(html.match(/assets\/one\.[0-9a-f]{16}\.png/g)?.length).toBeGreaterThanOrEqual(4);
-    expect(html).toContain("https://example.test/image.png");
-    expect(html).toContain("color:#010203");
-    expect(warnings).toEqual(["mdxx: remote asset is mutable: https://example.test/image.png"]);
-  } finally {
-    await Bun.$`rm -rf ${directory}`;
-  }
-}, 30_000);
-
-test("rewrites spaced and reference-style Markdown assets", async () => {
-  const directory = (await Bun.$`mktemp -d`.text()).trim();
-  const document = join(directory, "references.mdx");
-  try {
-    await Bun.write(join(directory, "my image.png"), "spaced asset");
-    await Bun.write(
-      document,
-      "---\nmdxx:\n  format: 1\n---\n\n![Angle](<./my image.png>)\n\n![Reference][image]\n\n[image]: <./my image.png>\n",
+      "---\nmdxx:\n  format: 1\n---\n\nimport './style.css'\nimport {Component} from './Component.tsx'\n\n<Component />\n\n![One](./one.png)\n",
     );
     const htmlPath = await build(document, { output: join(directory, "output") });
     const html = await Bun.file(htmlPath).text();
-    expect(html.match(/assets\/my-image\.[0-9a-f]{16}\.png/g)?.length).toBeGreaterThanOrEqual(2);
+    const files = await Array.fromAsync(new Bun.Glob("assets/*").scan({ cwd: join(directory, "output"), onlyFiles: true }));
+    expect(files.some((path) => /^assets\/one\.[0-9a-f]{16}\.png$/.test(path))).toBe(true);
+    const cssPath = files.find((path) => path.endsWith(".css"));
+    expect(cssPath).toBeDefined();
+    expect(await Bun.file(join(directory, "output", cssPath!)).text()).toContain("color:#010203");
+    expect(html).toContain(`<link rel="stylesheet" href="${cssPath}">`);
   } finally {
     await Bun.$`rm -rf ${directory}`;
   }

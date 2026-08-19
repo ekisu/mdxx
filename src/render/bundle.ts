@@ -1,16 +1,21 @@
-import { mkdir, readdir } from "node:fs/promises";
-import { basename, extname, join } from "node:path";
+import { copyFile, mkdir } from "node:fs/promises";
+import { basename, dirname, extname, join, relative, resolve } from "node:path";
 import { MdxxError } from "../shared/errors.ts";
 import { clientEntry } from "./client-entry.ts";
 import { mdxPlugin } from "./compile.ts";
-import { serverEntry } from "./server-entry.ts";
 import type { EmittedAssets } from "../assets/emit.ts";
 import { sha256 } from "../shared/digest.ts";
 
-export interface RenderBundles {
-  serverPath: string;
-  clientJavaScript: string;
-  css: string[];
+export interface BrowserArtifact {
+  path: string;
+  kind: Bun.BuildArtifact["kind"];
+  loader: Bun.Loader;
+}
+
+export interface BrowserManifest {
+  artifacts: BrowserArtifact[];
+  scripts: string[];
+  styles: string[];
 }
 
 export interface BundleDependencies {
@@ -18,45 +23,57 @@ export interface BundleDependencies {
   mappings: Map<string, string>;
 }
 
-function entryPlugin(name: string, contents: string): Bun.BunPlugin {
-  return {
-    name: `mdxx-${name}`,
-    setup(builder) {
-      builder.onResolve({ filter: new RegExp(`^${name}$`) }, () => ({ path: name, namespace: "mdxx-entry" }));
-      builder.onLoad({ filter: /.*/, namespace: "mdxx-entry" }, () => ({ contents, loader: "tsx" }));
-    },
-  };
+function normalizeImports(source: string, mappings: Map<string, string>): string {
+  let result = source;
+  for (const [authored, runtime] of mappings) {
+    result = result.replaceAll(JSON.stringify(authored), JSON.stringify(runtime));
+    result = result.replaceAll(`'${authored}'`, `'${runtime}'`);
+  }
+  return result;
 }
 
-function runtimePlugin(): Bun.BunPlugin {
-  return {
-    name: "mdxx-runtime",
-    setup(builder) {
-      builder.onResolve({ filter: /^react(?:-dom)?(?:\/.*)?$/ }, ({ path }) => ({
-        path: Bun.resolveSync(path, import.meta.dir),
-      }));
-    },
-  };
+function commonDirectory(paths: string[]): string {
+  let directory = dirname(resolve(paths[0] ?? "."));
+  while (paths.some((path) => relative(directory, resolve(path)).startsWith(".."))) {
+    const parent = dirname(directory);
+    if (parent === directory) break;
+    directory = parent;
+  }
+  return directory;
 }
 
-function dependencyPlugin(dependencies?: BundleDependencies): Bun.BunPlugin {
-  return {
-    name: "mdxx-dependencies",
-    setup(builder) {
-      if (!dependencies) return;
-      builder.onResolve({ filter: /^[^.\/]|^@/ }, ({ path, importer }) => {
-        if (path.includes(":")) return undefined;
-        if (importer.startsWith(dependencies.directory)) return undefined;
-        const mapped = dependencies.mappings.get(path);
-        if (!mapped) return undefined;
-        try {
-          return { path: Bun.resolveSync(mapped, dependencies.directory) };
-        } catch {
-          return undefined;
-        }
-      });
-    },
+async function createCapsuleSources(
+  documentPath: string,
+  sourcePaths: string[],
+  dependencies: BundleDependencies,
+  assets?: EmittedAssets,
+): Promise<{ documentPath: string; copies: Map<string, string>; assets?: EmittedAssets }> {
+  const sources = [...new Set([documentPath, ...sourcePaths].map((path) => resolve(path)))].sort((a, b) => a.localeCompare(b, "en"));
+  const sourceRoot = commonDirectory(sources);
+  const copies = new Map<string, string>();
+
+  for (const source of sources) {
+    const destination = join(dependencies.directory, "source", relative(sourceRoot, source));
+    await mkdir(dirname(destination), { recursive: true });
+    const extension = source.slice(source.lastIndexOf(".")).toLowerCase();
+    if ([".mdx", ".js", ".jsx", ".mjs", ".ts", ".tsx", ".mts"].includes(extension)) {
+      await Bun.write(destination, normalizeImports(await Bun.file(source).text(), dependencies.mappings));
+    } else {
+      await copyFile(source, destination);
+    }
+    copies.set(source, destination);
+  }
+
+  const copiedAssets = assets && {
+    urls: assets.urls,
+    references: assets.references.map((reference) => ({
+      ...reference,
+      importer: copies.get(resolve(reference.importer)) ?? reference.importer,
+    })),
   };
+  const copiedDocument = copies.get(resolve(documentPath));
+  if (!copiedDocument) throw new MdxxError("BUNDLE_FAILED", "document was not copied into the application capsule");
+  return { documentPath: copiedDocument, copies, assets: copiedAssets };
 }
 
 function assetPlugin(assets?: EmittedAssets): Bun.BunPlugin {
@@ -82,7 +99,7 @@ function assetPlugin(assets?: EmittedAssets): Bun.BunPlugin {
         const css = path.endsWith(".css");
         for (const reference of references) {
           const url = reference.resolved ? assets.urls.get(reference.resolved) : undefined;
-          if (url) contents = contents.replaceAll(reference.specifier, css ? `https://mdxx.invalid/${url}` : url);
+          if (url) contents = contents.replaceAll(reference.specifier, css ? `https://mdxx.invalid/${basename(url)}` : url);
         }
         const extension = path.slice(path.lastIndexOf(".") + 1);
         return { contents, loader: extension as "css" | "ts" | "tsx" | "js" | "jsx" };
@@ -91,89 +108,94 @@ function assetPlugin(assets?: EmittedAssets): Bun.BunPlugin {
   };
 }
 
-async function assertBuild(result: Bun.BuildOutput, label: string): Promise<void> {
-  if (!result.success) {
-    const details = result.logs.map((log) => log.message).join("\n");
-    throw new MdxxError("BUNDLE_FAILED", `${label} bundle failed${details ? `: ${details}` : ""}`);
-  }
+function assertBuild(result: Bun.BuildOutput): void {
+  if (result.success) return;
+  const details = result.logs.map((log) => log.message).join("\n");
+  throw new MdxxError("BUNDLE_FAILED", `browser bundle failed${details ? `: ${details}` : ""}`);
 }
 
 export async function bundleDocument(
   documentPath: string,
   directory: string,
-  dependencies?: BundleDependencies,
+  dependencies: BundleDependencies,
+  sourcePaths: string[],
+  workerPaths: string[],
   assets?: EmittedAssets,
-  generatedAssetDirectory?: string,
-  mermaid = false,
-): Promise<RenderBundles> {
-  const serverDirectory = join(directory, "server");
-  await mkdir(serverDirectory, { recursive: true });
-  const server = await Bun.build({
-    entrypoints: ["mdxx-server-entry"],
-    outdir: serverDirectory,
-    naming: { entry: "[name].[ext]", asset: "[name].[ext]" },
-    target: "bun",
-    format: "esm",
-    packages: "bundle",
-    minify: false,
-    define: { "process.env.NODE_ENV": '"production"' },
-    sourcemap: "none",
-    plugins: [entryPlugin("mdxx-server-entry", serverEntry(documentPath)), runtimePlugin(), dependencyPlugin(dependencies), assetPlugin(assets), mdxPlugin(assets?.references, assets?.urls)],
-  });
-  await assertBuild(server, "server");
+  outputDirectory?: string,
+): Promise<BrowserManifest> {
+  if (!outputDirectory) throw new MdxxError("BUNDLE_FAILED", "browser bundle has no output directory");
+  const capsule = await createCapsuleSources(documentPath, sourcePaths, dependencies, assets);
+  const entryDirectory = join(dependencies.directory, "entries");
+  const buildDirectory = join(directory, "browser");
+  await mkdir(entryDirectory, { recursive: true });
+  await mkdir(buildDirectory, { recursive: true });
+  const entryPath = join(entryDirectory, "client.tsx");
+  await Bun.write(entryPath, clientEntry(relative(entryDirectory, capsule.documentPath).replaceAll("\\", "/").replace(/^(?!\.)/, "./")));
 
-  const client = await Bun.build({
-    entrypoints: ["mdxx-client-entry"],
+  const result = await Bun.build({
+    entrypoints: [entryPath, ...workerPaths.map((path) => capsule.copies.get(resolve(path))).filter((path): path is string => path !== undefined)],
+    outdir: buildDirectory,
+    root: dependencies.directory,
     target: "browser",
     format: "esm",
+    splitting: true,
     packages: "bundle",
+    naming: { entry: "[name]-[hash].[ext]", chunk: "chunk-[hash].[ext]", asset: "[name]-[hash].[ext]" },
     minify: true,
     define: { "process.env.NODE_ENV": '"production"' },
+    env: "disable",
     sourcemap: "none",
-    plugins: [entryPlugin("mdxx-client-entry", clientEntry(documentPath, mermaid)), runtimePlugin(), dependencyPlugin(dependencies), assetPlugin(assets), mdxPlugin(assets?.references, assets?.urls)],
+    allowUnresolved: [],
+    conditions: ["browser", "import", "default"],
+    plugins: [assetPlugin(capsule.assets), mdxPlugin(capsule.assets?.references, capsule.assets?.urls)],
+    throw: false,
   });
-  await assertBuild(client, "browser");
+  assertBuild(result);
 
-  const javascript = client.outputs.find((output) => output.path.endsWith(".js"));
-  if (!javascript) throw new MdxxError("BUNDLE_FAILED", "browser bundle produced no JavaScript");
-  const cssOutputs = client.outputs.filter((output) => output.path.endsWith(".css"));
-  const generated = client.outputs.filter((output) => !output.path.endsWith(".js") && !output.path.endsWith(".css"));
-  const rewrites = new Map<string, string>();
-  if (generated.length > 0) {
-    if (!generatedAssetDirectory) throw new MdxxError("BUNDLE_FAILED", "bundle emitted assets without an output directory");
-    await mkdir(generatedAssetDirectory, { recursive: true });
-    for (const output of generated) {
-      const bytes = new Uint8Array(await output.arrayBuffer());
-      const extension = extname(output.path).toLowerCase();
-      const stem = basename(output.path, extension).replace(/-[A-Za-z0-9]+$/, "").replace(/[^A-Za-z0-9._-]+/g, "-") || "asset";
-      const name = `${stem}.${sha256(bytes).slice(7, 23)}${extension}`;
-      await Bun.write(join(generatedAssetDirectory, name), bytes);
-      rewrites.set(basename(output.path), `assets/${name}`);
-    }
+  const outputs = [...result.outputs].sort((a, b) => basename(a.path).localeCompare(basename(b.path), "en"));
+  const originalNames = outputs.map((output) => basename(output.path));
+  const contents = await Promise.all(outputs.map(async (output) => new Uint8Array(await output.arrayBuffer())));
+  const decoder = new TextDecoder();
+  const encoder = new TextEncoder();
+  const workerOutputs = new Map<string, string>();
+  for (const workerPath of workerPaths) {
+    const stem = basename(workerPath, extname(workerPath));
+    const output = originalNames.find((name) => name.startsWith(`${stem}-`) && name.endsWith(".js"));
+    if (output) workerOutputs.set(`./${basename(workerPath)}`, output);
   }
-  const rewriteGenerated = (source: string): string => {
-    let result = source.replaceAll("https://mdxx.invalid/", "");
-    for (const [from, to] of rewrites) result = result.replaceAll(from, to);
-    return result;
+  const linkWorkers = (source: string): string => {
+    let linked = source;
+    for (const [specifier, output] of workerOutputs) linked = linked.replaceAll(specifier, output);
+    return linked;
   };
-  const css = await Promise.all(cssOutputs.map(async (output) => rewriteGenerated(await output.text())));
+  const normalized = contents.map((bytes, index) => {
+    if (!originalNames[index]?.match(/\.(?:css|js)$/)) return bytes;
+    let source = linkWorkers(decoder.decode(bytes)).replaceAll("https://mdxx.invalid/", "");
+    for (const [outputIndex, name] of originalNames.entries()) source = source.replaceAll(name, `__MDXX_OUTPUT_${outputIndex}__`);
+    return encoder.encode(source);
+  });
+  const finalNames = outputs.map((_, index) => {
+    const original = originalNames[index] ?? "asset";
+    const extension = extname(original).toLowerCase();
+    const stem = basename(original, extension).replace(/-[a-z0-9]{8}$/i, "").replace(/[^A-Za-z0-9._-]+/g, "-") || "asset";
+    return `${stem}-${sha256(normalized[index]!).slice(7, 23)}${extension}`;
+  });
 
-  const serverFiles = await readdir(serverDirectory);
-  const serverFile = serverFiles.find((path) => path.endsWith(".js"));
-  if (!serverFile) throw new MdxxError("BUNDLE_FAILED", "server bundle produced no JavaScript");
-  let clientJavaScript = rewriteGenerated(await javascript.text());
-  if (mermaid) {
-    const mermaidPath = Bun.resolveSync("mermaid/dist/mermaid.min.js", import.meta.dir);
-    const standalone = await Bun.file(mermaidPath).text();
-    const header = '"use strict";var __esbuild_esm_mermaid_nm;';
-    if (!standalone.startsWith(header)) {
-      throw new MdxxError("BUNDLE_FAILED", "unsupported Mermaid standalone bundle format");
+  await mkdir(outputDirectory, { recursive: true });
+  const artifacts: BrowserArtifact[] = [];
+  for (const [index, output] of outputs.entries()) {
+    let bytes = contents[index]!;
+    if (originalNames[index]?.match(/\.(?:css|js)$/)) {
+      let source = linkWorkers(decoder.decode(bytes)).replaceAll("https://mdxx.invalid/", "");
+      for (const [outputIndex, name] of originalNames.entries()) source = source.replaceAll(name, finalNames[outputIndex]!);
+      bytes = encoder.encode(source);
     }
-    const mermaidSource = standalone.replace(
-      header,
-      '"use strict";var __esbuild_esm_mermaid_nm=globalThis.__esbuild_esm_mermaid_nm={};',
-    );
-    clientJavaScript = `${clientJavaScript}\n${mermaidSource}\n;globalThis.__mdxxMermaid=globalThis.mermaid;globalThis.__mdxxMermaid.initialize({startOnLoad:false});`;
+    const name = finalNames[index]!;
+    await Bun.write(join(outputDirectory, name), bytes);
+    artifacts.push({ path: `assets/${name}`, kind: output.kind, loader: output.loader });
   }
-  return { serverPath: join(serverDirectory, serverFile), clientJavaScript, css };
+  const scripts = artifacts.filter((item) => item.kind === "entry-point" && item.path.startsWith("assets/client-") && item.path.endsWith(".js")).map((item) => item.path);
+  if (scripts.length === 0) throw new MdxxError("BUNDLE_FAILED", "browser bundle produced no JavaScript entry");
+  const styles = artifacts.filter((item) => item.path.endsWith(".css")).map((item) => item.path);
+  return { artifacts, scripts, styles };
 }

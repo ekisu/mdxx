@@ -6,8 +6,8 @@ mdxx:
   requires: ">=1 <2"
 ---
 
-import {PhaseExplorer, SystemGraphs} from './plan-components.tsx'
-import './mdxx-project-plan.css'
+import {PhaseExplorer, SystemGraphs} from './components.tsx'
+import './styles.css'
 
 # Documents that carry their *own evidence.*
 
@@ -52,22 +52,6 @@ Select a delivery phase to inspect its exit criteria.
 
 Discovery feeds both dependency resolution and rendering. `build` and `run` share the exact same output path, preventing a second development-only contract from emerging.
 
-### Mermaid: the dependency flow
-
-This graph is authored as a plain `mermaid` code fence. mdxx keeps the source readable and initializes the diagram after React hydration.
-
-```mermaid
-flowchart LR
-  MDX[document.mdx] --> Scan[Discover graph]
-  Scan --> Lock{Current lock?}
-  Lock -->|yes| Frozen[Frozen install]
-  Lock -->|no| Resolve[Resolve packages]
-  Frozen --> Bundle[Server + browser bundles]
-  Resolve --> Bundle
-  Bundle --> SSR[Deterministic SSR]
-  SSR --> HTML[Interactive HTML]
-```
-
 ### Imported React charts: inspect the renderer
 
 The readiness graph imports `react-minimal-pie-chart` directly from npm; no install step or wrapper syntax is needed. Select its segments or bars to inspect capability evidence, and select nodes in the local React pipeline beside it.
@@ -81,7 +65,7 @@ The readiness graph imports `react-minimal-pie-chart` directly from npm; no inst
 | Track | Primary question | Proof |
 | --- | --- | --- |
 | **A / Format** | Can malformed or ambiguous input enter the graph? | `Parser fixtures` |
-| **B / Runtime** | Can server markup hydrate without changing meaning? | `DOM interaction` |
+| **B / Runtime** | Does client mounting support ordinary browser components? | `DOM interaction` |
 | **C / Supply chain** | Can every installed byte be tied to the lock? | `Frozen reinstall` |
 | **D / Output** | Can another machine emit the same tree? | `Byte comparison` |
 
@@ -91,7 +75,7 @@ The readiness graph imports `react-minimal-pie-chart` directly from npm; no inst
 
 1. **OS-level sandboxing**
 
-   Subprocess separation clears secrets and contains failures, but filesystem and network enforcement remains platform-dependent.
+   Browser code has normal authority on the served origin and requires an external sandbox when untrusted.
 
 2. **Remote asset mutability**
 
@@ -101,7 +85,7 @@ The readiness graph imports `react-minimal-pie-chart` directly from npm; no inst
 
    The mdxx major version owns compiler, React, serializer, and bundler behavior. Contract changes require a deliberate version boundary.
 
-> **Exit condition:** A plain document builds twice, hydrates once, and differs by zero bytes.
+> **Exit condition:** A plain document emits the same build tree twice and mounts successfully in a browser.
 
 ---
 

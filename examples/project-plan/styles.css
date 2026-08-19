@@ -10,7 +10,7 @@
 html { scroll-behavior: smooth; }
 body { margin: 0; background: #090d12; }
 body::before { content: ""; position: fixed; inset: 0; pointer-events: none; opacity: .2; background-image: linear-gradient(rgba(255,255,255,.025) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,.025) 1px, transparent 1px); background-size: 48px 48px; mask-image: linear-gradient(to bottom, black, transparent 80%); }
-#mdxx-root { display: block; width: min(960px, calc(100% - 48px)); margin: 0 auto; padding: 90px 0 60px; }
+#mdxx-root { width: min(960px, calc(100% - 48px)); margin: 0 auto; padding: 90px 0 60px; }
 
 h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 400; letter-spacing: -.04em; }
 h1 { max-width: 900px; margin: 0 0 42px; font-size: clamp(58px, 8vw, 108px); line-height: .92; }
@@ -40,8 +40,6 @@ ol, ul { color: #9eacb2; line-height: 1.7; }
 #mdxx-root > ol > li { position: relative; margin: 0; padding: 28px 20px 28px 62px; border-top: 1px solid #2d3840; counter-increment: risks; }
 #mdxx-root > ol > li::before { content: "0" counter(risks); position: absolute; left: 12px; top: 32px; color: #65e8bf; font: 700 10px ui-monospace, monospace; }
 #mdxx-root > ol > li > p { margin-bottom: 0; }
-.mermaid { min-height: 280px; margin: 42px 0; padding: 28px; overflow-x: auto; border: 1px solid #2c3740; border-radius: 3px; background: linear-gradient(145deg, #0d151b, #101a20); color: #82919a; white-space: pre; font: 12px/1.6 ui-monospace, monospace; }
-.mermaid svg { display: block; max-width: 100%; height: auto; margin: auto; }
 
 .phase-explorer { display: grid; grid-template-columns: .82fr 1.18fr; gap: 48px; margin: 54px 0 20px; }
 .phase-tabs { display: flex; flex-direction: column; }
