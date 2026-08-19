@@ -34,6 +34,20 @@ export function Greeting({name}) { return <strong>Hello {name}</strong> }
   }
 }, 30_000);
 
+test("renders GFM tables as semantic Markdown", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "table.mdx");
+  try {
+    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n| Track | Proof |\n| --- | ---: |\n| Format | 100 |\n");
+    const htmlPath = await build(document, { output: join(directory, "output") });
+    const html = await Bun.file(htmlPath).text();
+    expect(html).toContain("<table>");
+    expect(html).toContain('<th style="text-align:right">Proof</th>');
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
 test("renders an inline typed TSX component", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const document = join(directory, "typed.mdx");

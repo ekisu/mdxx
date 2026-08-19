@@ -6,6 +6,7 @@ import { isCodePath, resolveLocalModule } from "../shared/paths.ts";
 import type { ImportGraph, ImportReference } from "./graph.ts";
 import { isBuiltinSpecifier, parsePackageSpecifier, type PackageSpecifier } from "./specifier.ts";
 import { transpileMdxEsm } from "../document/typescript.ts";
+import remarkGfm from "remark-gfm";
 
 interface SyntaxNode {
   type?: string;
@@ -44,7 +45,10 @@ async function parseModule(path: string, mdxBody?: string): Promise<string[]> {
   if (mdxBody !== undefined || extname(path).toLowerCase() === ".mdx") {
     const source = transpileMdxEsm(mdxBody ?? (await Bun.file(path).text()), path);
     try {
-      code = String(await compile({ value: source, path }, { outputFormat: "program", development: false, jsx: true }));
+      code = String(await compile(
+        { value: source, path },
+        { outputFormat: "program", development: false, jsx: true, remarkPlugins: [remarkGfm] },
+      ));
     } catch (cause) {
       throw new MdxxError("INVALID_MDX", `could not compile ${path}`, { cause });
     }

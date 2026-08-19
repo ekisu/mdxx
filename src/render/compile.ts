@@ -3,6 +3,7 @@ import { parseDocument } from "../document/parse.ts";
 import { MdxxError } from "../shared/errors.ts";
 import type { AssetReference } from "../assets/discover.ts";
 import { transpileMdxEsm } from "../document/typescript.ts";
+import remarkGfm from "remark-gfm";
 
 function rewriteReferences(path: string, source: string, references: AssetReference[], urls: Map<string, string>): string {
   let result = source;
@@ -43,6 +44,7 @@ export async function compileMdx(
           jsxRuntime: "automatic",
           jsxImportSource: "react",
           development: false,
+          remarkPlugins: [remarkGfm],
         },
       ),
     );
