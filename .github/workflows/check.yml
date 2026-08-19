@@ -20,7 +20,7 @@ jobs:
       - uses: browser-actions/setup-chrome@v2
         id: chrome
         with:
-          chrome-version: latest
+          chrome-version: 151
 
       - run: echo "CHROMIUM_PATH=${{ steps.chrome.outputs.chrome-path }}" >> "$GITHUB_ENV"
 
