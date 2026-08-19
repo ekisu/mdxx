@@ -5,7 +5,7 @@ import { discoverImports } from "../imports/discover.ts";
 import { prepareDependencies } from "../dependencies/resolve.ts";
 import { renderDocument } from "../render/renderer.ts";
 import { MdxxError } from "../shared/errors.ts";
-import { readDocument } from "../shared/paths.ts";
+import { pathExists, readDocument } from "../shared/paths.ts";
 import { discoverAssets } from "../assets/discover.ts";
 import { emitAssets } from "../assets/emit.ts";
 
@@ -17,7 +17,7 @@ export interface BuildOptions {
 export async function build(path: string, options: BuildOptions): Promise<string> {
   const documentPath = resolve(path);
   const output = resolve(options.output);
-  if (await Bun.file(output).exists()) throw new MdxxError("OUTPUT_EXISTS", `output path already exists: ${options.output}`);
+  if (await pathExists(output)) throw new MdxxError("OUTPUT_EXISTS", `output path already exists: ${options.output}`);
 
   const document = parseDocument(await readDocument(documentPath));
   if (document.lock && !document.lockFresh) throw new MdxxError("STALE_LOCK", "embedded lock does not match the document source");

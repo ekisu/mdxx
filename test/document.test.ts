@@ -33,6 +33,11 @@ describe("document parsing", () => {
     expect(() => parseDocument(source.replace("format: 1", "format: 1\n  render:\n    mode: static"))).toThrow("must be interactive");
   });
 
+  test("validates the required CLI version", () => {
+    expect(() => parseDocument(source.replace("format: 1", 'format: 1\n  requires: "not a range"'))).toThrow("valid semver range");
+    expect(() => parseDocument(source.replace("format: 1", 'format: 1\n  requires: ">=2"'))).toThrow("current version is 1.0.0");
+  });
+
   test("tracks fresh and stale locks", () => {
     const digest = parseDocument(source).sourceDigest;
     const locked = appendEmbeddedLock(source, { sourceDigest: digest, packages: [] });

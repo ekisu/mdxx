@@ -1,5 +1,6 @@
 import { dirname, extname, resolve } from "node:path";
 import { MdxxError } from "./errors.ts";
+import { stat } from "node:fs/promises";
 
 export async function readDocument(path: string): Promise<string> {
   const file = Bun.file(path);
@@ -15,6 +16,16 @@ export async function atomicWrite(path: string, contents: string | Uint8Array): 
     await import("node:fs/promises").then(({ rename }) => rename(temporary, path));
   } catch (error) {
     await import("node:fs/promises").then(({ rm }) => rm(temporary, { force: true }));
+    throw error;
+  }
+}
+
+export async function pathExists(path: string): Promise<boolean> {
+  try {
+    await stat(path);
+    return true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return false;
     throw error;
   }
 }

@@ -1,6 +1,7 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { build } from "../src/commands/build.ts";
+import { renderInWorker } from "../src/render/worker.ts";
 
 test("builds deterministic server-rendered and hydratable HTML", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
@@ -28,6 +29,30 @@ export function Greeting({name}) { return <strong>Hello {name}</strong> }
     expect(first).toContain("<strong>Hello <!-- -->world</strong>");
     expect(first).toContain('<script type="module">');
     expect(first).not.toContain(directory);
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
+test("times out a stuck render subprocess", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const worker = join(directory, "stuck.js");
+  try {
+    await Bun.write(worker, "while (true) {}\n");
+    await expect(renderInWorker(worker, {}, 50)).rejects.toThrow("render exceeded 50ms");
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 5_000);
+
+test("leaves no partial output after a runtime failure", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "failure.mdx");
+  const output = join(directory, "output");
+  try {
+    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n{(() => { throw new Error('render boom') })()}\n");
+    await expect(build(document, { output })).rejects.toThrow("render boom");
+    expect(await Bun.file(output).exists()).toBe(false);
   } finally {
     await Bun.$`rm -rf ${directory}`;
   }

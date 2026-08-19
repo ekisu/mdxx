@@ -1,4 +1,5 @@
 import { MdxxError } from "../shared/errors.ts";
+import { satisfies, validRange } from "semver";
 
 export interface MdxxConfig {
   format: 1;
@@ -38,6 +39,12 @@ export function validateFrontmatter(value: unknown): FrontmatterData {
   }
   if (mdxx.requires !== undefined && typeof mdxx.requires !== "string") {
     throw new MdxxError("INVALID_FRONTMATTER", "mdxx.requires must be a string");
+  }
+  if (typeof mdxx.requires === "string") {
+    if (!validRange(mdxx.requires)) throw new MdxxError("INVALID_FRONTMATTER", "mdxx.requires must be a valid semver range");
+    if (!satisfies("1.0.0", mdxx.requires)) {
+      throw new MdxxError("INCOMPATIBLE_VERSION", `document requires mdxx ${mdxx.requires}, current version is 1.0.0`);
+    }
   }
 
   const render = mdxx.render === undefined ? {} : object(mdxx.render, "mdxx.render");

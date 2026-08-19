@@ -5,6 +5,7 @@ import { unlock } from "./commands/unlock.ts";
 import { verify } from "./commands/verify.ts";
 import { build } from "./commands/build.ts";
 import { lock } from "./commands/lock.ts";
+import { run } from "./commands/run.ts";
 import { canonicalJson } from "./shared/canonical-json.ts";
 import { MdxxError } from "./shared/errors.ts";
 
@@ -64,6 +65,9 @@ export async function main(args: string[]): Promise<number> {
         console.log(`Built ${html}`);
         break;
       }
+      case "run":
+        await run(path, locked);
+        break;
       default:
         throw new MdxxError("USAGE", `unknown command: ${command}\n${USAGE}`);
     }
