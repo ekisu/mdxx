@@ -3,6 +3,7 @@ import { init } from "./commands/init.ts";
 import { inspect } from "./commands/inspect.ts";
 import { unlock } from "./commands/unlock.ts";
 import { verify } from "./commands/verify.ts";
+import { build } from "./commands/build.ts";
 import { canonicalJson } from "./shared/canonical-json.ts";
 import { MdxxError } from "./shared/errors.ts";
 
@@ -14,6 +15,15 @@ function documentArgument(args: string[]): string {
   return paths[0] as string;
 }
 
+function option(args: string[], name: string): string | undefined {
+  const index = args.indexOf(name);
+  if (index < 0) return undefined;
+  const value = args[index + 1];
+  if (!value || value.startsWith("-")) throw new MdxxError("USAGE", `${name} requires a value`);
+  args.splice(index, 2);
+  return value;
+}
+
 export async function main(args: string[]): Promise<number> {
   try {
     if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
@@ -21,7 +31,12 @@ export async function main(args: string[]): Promise<number> {
       return 0;
     }
 
-    const [command, ...rest] = args;
+    const [command, ...argumentsForCommand] = args;
+    const rest = [...argumentsForCommand];
+    const output = option(rest, "--output");
+    const lockedIndex = rest.indexOf("--locked");
+    const locked = lockedIndex >= 0;
+    if (locked) rest.splice(lockedIndex, 1);
     const path = documentArgument(rest);
     switch (command) {
       case "init":
@@ -39,6 +54,11 @@ export async function main(args: string[]): Promise<number> {
         await verify(path);
         console.log(`${path}: valid`);
         break;
+      case "build": {
+        const html = await build(path, { output: output ?? "dist", locked });
+        console.log(`Built ${html}`);
+        break;
+      }
       default:
         throw new MdxxError("USAGE", `unknown command: ${command}\n${USAGE}`);
     }
