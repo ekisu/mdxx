@@ -2,6 +2,7 @@ import { compile } from "@mdx-js/mdx";
 import { parseDocument } from "../document/parse.ts";
 import { MdxxError } from "../shared/errors.ts";
 import type { AssetReference } from "../assets/discover.ts";
+import { transpileMdxEsm } from "../document/typescript.ts";
 
 function rewriteReferences(path: string, source: string, references: AssetReference[], urls: Map<string, string>): string {
   let result = source;
@@ -22,7 +23,7 @@ export async function compileMdx(
   let document;
   try {
     document = parseDocument(source);
-    document.body = rewriteReferences(path, document.body, references, urls);
+    document.body = transpileMdxEsm(rewriteReferences(path, document.body, references, urls), path);
   } catch (cause) {
     throw new MdxxError("INVALID_MDX", `could not parse ${path}`, { cause });
   }

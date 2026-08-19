@@ -5,6 +5,7 @@ import { MdxxError } from "../shared/errors.ts";
 import { isCodePath, resolveLocalModule } from "../shared/paths.ts";
 import type { ImportGraph, ImportReference } from "./graph.ts";
 import { isBuiltinSpecifier, parsePackageSpecifier, type PackageSpecifier } from "./specifier.ts";
+import { transpileMdxEsm } from "../document/typescript.ts";
 
 interface SyntaxNode {
   type?: string;
@@ -38,7 +39,7 @@ function collectSpecifiers(root: unknown): string[] {
 async function parseModule(path: string, mdxBody?: string): Promise<string[]> {
   let code: string;
   if (mdxBody !== undefined || extname(path).toLowerCase() === ".mdx") {
-    const source = mdxBody ?? (await Bun.file(path).text());
+    const source = transpileMdxEsm(mdxBody ?? (await Bun.file(path).text()), path);
     try {
       code = String(await compile({ value: source, path }, { outputFormat: "program", development: false, jsx: true }));
     } catch (cause) {

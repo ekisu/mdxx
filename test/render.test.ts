@@ -34,6 +34,36 @@ export function Greeting({name}) { return <strong>Hello {name}</strong> }
   }
 }, 30_000);
 
+test("renders an inline typed TSX component", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "typed.mdx");
+  try {
+    await Bun.write(
+      document,
+      `---
+mdxx:
+  format: 1
+---
+
+export interface MetricProps {
+  label: string
+  value: number
+}
+export function Metric({label, value}: MetricProps) {
+  return <section><strong>{value}</strong><span>{label}</span></section>
+}
+
+<Metric label="Downloads" value={12400} />
+`,
+    );
+    const htmlPath = await build(document, { output: join(directory, "output") });
+    const html = await Bun.file(htmlPath).text();
+    expect(html).toContain("<strong>12400</strong><span>Downloads</span>");
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
 test("times out a stuck render subprocess", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const worker = join(directory, "stuck.js");
