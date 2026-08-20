@@ -5,7 +5,7 @@
   "license": "MIT",
   "module": "src/index.ts",
   "bin": {
-    "mdxx": "./src/index.ts"
+    "mdxx": "src/index.ts"
   },
   "type": "module",
   "files": [
