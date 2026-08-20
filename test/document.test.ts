@@ -43,7 +43,7 @@ describe("document parsing", () => {
 
   test("validates the required CLI version", () => {
     expect(() => parseDocument(source.replace("format: 1", 'format: 1\n  requires: "not a range"'))).toThrow("valid semver range");
-    expect(() => parseDocument(source.replace("format: 1", 'format: 1\n  requires: ">=1"'))).toThrow("current version is 0.1.0");
+    expect(() => parseDocument(source.replace("format: 1", 'format: 1\n  requires: ">=1"'))).toThrow("current version is 0.2.0");
   });
 
   test("tracks fresh and stale locks", () => {

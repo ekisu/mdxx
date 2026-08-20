@@ -8,7 +8,7 @@ import { canonicalJson } from "../shared/canonical-json.ts";
 import { parseBunLock, type ResolvedPackage } from "./bun-lock.ts";
 import type { DependencyEnvironment } from "./environment.ts";
 import { satisfies, validRange } from "semver";
-import { REACT_DOM_VERSION, REACT_VERSION, reactRuntime } from "../render/runtime.ts";
+import { MERMAID_VERSION, REACT_DOM_VERSION, REACT_VERSION, reactRuntime } from "../render/runtime.ts";
 import { MDXX_VERSION } from "../version.ts";
 
 export interface LockedRoot extends PackageSpecifier {
@@ -19,6 +19,7 @@ export interface DependencyLock extends EmbeddedLock {
   roots: LockedRoot[];
   packages: ResolvedPackage[];
   react: typeof reactRuntime;
+  features?: string[];
   peers: PeerDecision[];
   resolver: {
     name: "mdxx";
@@ -45,7 +46,7 @@ export interface PeerDecision {
 const RUNTIME_VERSIONS = new Map([["react", REACT_VERSION], ["react-dom", REACT_DOM_VERSION]]);
 
 function isDependencyLock(lock: EmbeddedLock): lock is DependencyLock {
-  if (!Array.isArray(lock.roots) || !Array.isArray(lock.packages) || !Array.isArray(lock.peers) || lock.target === null || typeof lock.target !== "object") return false;
+  if (!Array.isArray(lock.roots) || !Array.isArray(lock.packages) || !Array.isArray(lock.peers) || (lock.features !== undefined && !Array.isArray(lock.features)) || lock.target === null || typeof lock.target !== "object") return false;
   if (canonicalJson(lock.react) !== canonicalJson(reactRuntime)) return false;
   if (lock.resolver === null || typeof lock.resolver !== "object") return false;
   const resolver = lock.resolver as Record<string, unknown>;
@@ -54,8 +55,9 @@ function isDependencyLock(lock: EmbeddedLock): lock is DependencyLock {
     lock.packages.every((item) => item !== null && typeof item === "object");
 }
 
-function requestedDependencies(packages: PackageSpecifier[], lock?: DependencyLock): Record<string, string> {
+function requestedDependencies(packages: PackageSpecifier[], features: string[], lock?: DependencyLock): Record<string, string> {
   const result: Record<string, string> = { react: REACT_VERSION, "react-dom": REACT_DOM_VERSION };
+  if (features.includes("mermaid")) result.mermaid = MERMAID_VERSION;
   for (const specifier of packages) {
     const runtimeVersion = RUNTIME_VERSIONS.get(specifier.name);
     if (runtimeVersion) {
@@ -174,17 +176,21 @@ function assertSingleReactRuntime(packages: ResolvedPackage[]): void {
 export async function prepareDependencies(
   packages: PackageSpecifier[],
   embedded?: EmbeddedLock,
+  features: string[] = [],
 ): Promise<{ environment: DependencyEnvironment; lock: Omit<DependencyLock, "sourceDigest"> }> {
   const locked = embedded === undefined ? undefined : isDependencyLock(embedded) ? embedded : undefined;
   if (embedded && !locked) throw new MdxxError("INVALID_LOCK", "embedded lock is not a client dependency lock; refresh it with mdxx lock");
   if (locked) {
     assertCompatibleTarget(locked);
     verifyLockedRoots(packages, locked.roots);
+    if (canonicalJson(locked.features ?? []) !== canonicalJson(features)) {
+      throw new MdxxError("LOCK_MISMATCH", "embedded lock renderer features do not match the document");
+    }
   }
 
   const directory = await mkdtemp(join(tmpdir(), "mdxx-deps-"));
   try {
-    const dependencies = requestedDependencies(packages, locked);
+    const dependencies = requestedDependencies(packages, features, locked);
     await Bun.write(join(directory, "package.json"), canonicalJson({ name: "mdxx-app", private: true, dependencies }));
     if (locked) {
       const state = locked.resolver.state;
@@ -219,6 +225,7 @@ export async function prepareDependencies(
         roots,
         packages: resolved,
         react: reactRuntime,
+        features,
         peers,
         resolver: {
           name: "mdxx",

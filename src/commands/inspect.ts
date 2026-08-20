@@ -31,6 +31,7 @@ export async function inspect(path: string): Promise<Record<string, unknown>> {
     client: {
       target: currentTarget(),
       react: reactRuntime,
+      features: graph.features,
       browserAssets: [...assets.files, ...assets.styles],
       chunks: "emitted during build",
     },

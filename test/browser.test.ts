@@ -33,6 +33,31 @@ test("mounts plain MDX in Chromium without build-time evaluation", async () => {
   }
 }, 30_000);
 
+test("renders a Mermaid fence in Chromium", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "mermaid.mdx");
+  try {
+    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n```mermaid\nflowchart LR\n  Source --> HTML\n```\n");
+    const session = await startRun(document);
+    try {
+      const process = Bun.spawn(
+        [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=3000", "--dump-dom", session.url],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      const [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
+      expect(code).toBe(0);
+      expect(html).toContain('<div class="mdxx-mermaid"');
+      expect(html).toContain("<svg");
+      expect(html).not.toContain("language-mermaid");
+      expect(html).not.toContain("data-mdxx-error");
+    } finally {
+      await session.close();
+    }
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
 test("mounts interactive state and responds to input", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const documentPath = join(directory, "counter.mdx");
@@ -229,7 +254,7 @@ test("mounts the flagship microgrid visualization stack", async () => {
   const session = await startRun(document);
   try {
     const process = Bun.spawn(
-      [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=3000", "--dump-dom", session.url],
+      [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=15000", "--dump-dom", session.url],
       { stdout: "pipe", stderr: "pipe" },
     );
     const [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);

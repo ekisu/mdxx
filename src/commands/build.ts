@@ -27,7 +27,7 @@ export async function build(path: string, options: BuildOptions): Promise<string
   const assets = await discoverAssets(documentPath, document.body, graph);
   for (const url of assets.remoteUrls) (options.onWarning ?? console.warn)(`mdxx: remote asset is mutable: ${url}`);
 
-  const prepared = await prepareDependencies(graph.packages, document.lock);
+  const prepared = await prepareDependencies(graph.packages, document.lock, graph.features);
 
   const parent = dirname(output);
   const staging = join(parent, `.mdxx-${basename(output)}-${crypto.randomUUID()}`);
@@ -43,6 +43,7 @@ export async function build(path: string, options: BuildOptions): Promise<string
       graph.imports.filter((item) => item.kind === "worker" && item.resolved).map((item) => item.resolved!),
       emitted,
       join(staging, "assets"),
+      graph.features,
     );
     const name = basename(documentPath, extname(documentPath));
     await Bun.write(join(staging, `${name}.html`), html);

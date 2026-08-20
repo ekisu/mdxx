@@ -1,6 +1,6 @@
 ---
 title: A small project graph
-description: A self-contained MDX document with one interactive SVG.
+description: A self-contained MDX document with an interactive SVG and a Mermaid diagram.
 mdxx:
   format: 1
 ---
@@ -14,6 +14,7 @@ body { margin: 0; }
 blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid #ccc; }
 table { border-collapse: collapse; }
 th, td { padding: .4rem 1.5rem .4rem 0; text-align: left; }
+.mdxx-mermaid { margin: 2rem 0; }
 </style>
 
 export interface GraphNode {
@@ -77,7 +78,7 @@ export function ProjectGraph() {
 
 # A small project graph
 
-This is an ordinary Markdown document with one interactive component. Everything needed to build it lives in this file.
+This is an ordinary Markdown document with one interactive component and one Mermaid diagram. Everything needed to build it lives in this file.
 
 > Prefer Markdown for document structure. Reach for a component only when interaction or custom rendering adds something Markdown cannot express.
 
@@ -86,6 +87,14 @@ This is an ordinary Markdown document with one interactive component. Everything
 Select a node to inspect that stage of the project.
 
 <ProjectGraph />
+
+### The same loop in Mermaid
+
+```mermaid
+flowchart LR
+  Brief --> Prototype --> Review --> Release --> Measure
+  Measure --> Prototype
+```
 
 ## Current status
 
@@ -105,4 +114,4 @@ The release checklist is intentionally unremarkable:
 
 ## Why this example exists
 
-The heading, prose, quotation, table, and checklist above are all Markdown. React is used only for the selectable graph and its detail readout. The presentation otherwise uses browser defaults, so the authored document remains easy to read and edit without specialized tooling.
+The heading, prose, quotation, table, checklist, and Mermaid fence above are all Markdown. React is used directly only for the selectable graph and its detail readout. The presentation otherwise uses browser defaults, so the authored document remains easy to read and edit without specialized tooling.

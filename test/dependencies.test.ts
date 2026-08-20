@@ -55,6 +55,7 @@ import escape from 'escape-html@1.0.3'
 
     const parsed = parseDocument(await Bun.file(document).text());
     expect(parsed.lock?.react).toEqual({ react: "19.2.8", reactDom: "19.2.8" });
+    expect(parsed.lock?.features).toEqual([]);
     expect(Array.isArray(parsed.lock?.peers)).toBe(true);
     const tampered = structuredClone(parsed.lock) as EmbeddedLock;
     const firstPackage = (tampered.packages as Array<Record<string, unknown>>)[0];

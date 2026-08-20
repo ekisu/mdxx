@@ -153,7 +153,7 @@ Locking is optional. `mdxx lock document.mdx` appends or replaces a generated JS
   "sourceDigest": "sha256-...",
   "resolver": {
     "name": "mdxx",
-    "version": "0.1.0"
+    "version": "0.2.0"
   },
   "target": {
     "runtime": "node",
@@ -275,6 +275,7 @@ The initial and default `interactive` profile:
 - Inlines generated component CSS when practical.
 - Rewrites local asset references to copied, content-addressed files.
 - Preserves remote asset URLs.
+- Renders fenced `mermaid` blocks with a pinned, locked browser runtime.
 - Executes document and component code only in the browser.
 - Does not require components to support server rendering.
 - Embeds frontmatter metadata as canonical data for the client entry.

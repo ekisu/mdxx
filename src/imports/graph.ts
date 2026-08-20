@@ -14,4 +14,5 @@ export interface ImportGraph {
   assets: string[];
   styles: string[];
   remoteUrls: string[];
+  features: string[];
 }

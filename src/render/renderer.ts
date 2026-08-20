@@ -14,10 +14,11 @@ export async function renderDocument(
   workerPaths: string[],
   assets?: EmittedAssets,
   generatedAssetDirectory?: string,
+  features: string[] = [],
 ): Promise<string> {
   const temporary = await mkdtemp(join(tmpdir(), "mdxx-render-"));
   try {
-    const manifest = await bundleDocument(documentPath, temporary, dependencies, sourcePaths, workerPaths, assets, generatedAssetDirectory);
+    const manifest = await bundleDocument(documentPath, temporary, dependencies, sourcePaths, workerPaths, assets, generatedAssetDirectory, features);
     return createHtml({ metadata, scripts: manifest.scripts, styles: manifest.styles });
   } finally {
     await rm(temporary, { recursive: true, force: true });

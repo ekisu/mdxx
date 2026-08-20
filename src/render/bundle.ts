@@ -122,6 +122,7 @@ export async function bundleDocument(
   workerPaths: string[],
   assets?: EmittedAssets,
   outputDirectory?: string,
+  features: string[] = [],
 ): Promise<BrowserManifest> {
   if (!outputDirectory) throw new MdxxError("BUNDLE_FAILED", "browser bundle has no output directory");
   const capsule = await createCapsuleSources(documentPath, sourcePaths, dependencies, assets);
@@ -130,7 +131,7 @@ export async function bundleDocument(
   await mkdir(entryDirectory, { recursive: true });
   await mkdir(buildDirectory, { recursive: true });
   const entryPath = join(entryDirectory, "client.tsx");
-  await Bun.write(entryPath, clientEntry(relative(entryDirectory, capsule.documentPath).replaceAll("\\", "/").replace(/^(?!\.)/, "./")));
+  await Bun.write(entryPath, clientEntry(relative(entryDirectory, capsule.documentPath).replaceAll("\\", "/").replace(/^(?!\.)/, "./"), features));
 
   const result = await Bun.build({
     entrypoints: [entryPath, ...workerPaths.map((path) => capsule.copies.get(resolve(path))).filter((path): path is string => path !== undefined)],
@@ -194,7 +195,21 @@ export async function bundleDocument(
     await Bun.write(join(outputDirectory, name), bytes);
     artifacts.push({ path: `assets/${name}`, kind: output.kind, loader: output.loader });
   }
-  const scripts = artifacts.filter((item) => item.kind === "entry-point" && item.path.startsWith("assets/client-") && item.path.endsWith(".js")).map((item) => item.path);
+  const runtimeScripts: string[] = [];
+  if (features.includes("mermaid")) {
+    const standalonePath = join(dependencies.directory, "node_modules", "mermaid", "dist", "mermaid.min.js");
+    const header = '"use strict";var __esbuild_esm_mermaid_nm;';
+    const standalone = await Bun.file(standalonePath).text();
+    if (!standalone.startsWith(header)) throw new MdxxError("BUNDLE_FAILED", "unsupported Mermaid standalone bundle format");
+    const source = standalone.replace(header, '"use strict";var __esbuild_esm_mermaid_nm=globalThis.__esbuild_esm_mermaid_nm={};');
+    const name = `mermaid-${sha256(source).slice(7, 23)}.js`;
+    await Bun.write(join(outputDirectory, name), source);
+    const path = `assets/${name}`;
+    runtimeScripts.push(path);
+    artifacts.push({ path, kind: "entry-point", loader: "js" });
+  }
+  const clientScripts = artifacts.filter((item) => item.kind === "entry-point" && item.path.startsWith("assets/client-") && item.path.endsWith(".js")).map((item) => item.path);
+  const scripts = [...runtimeScripts, ...clientScripts];
   if (scripts.length === 0) throw new MdxxError("BUNDLE_FAILED", "browser bundle produced no JavaScript entry");
   const styles = artifacts.filter((item) => item.path.endsWith(".css")).map((item) => item.path);
   return { artifacts, scripts, styles };

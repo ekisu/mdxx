@@ -8,6 +8,7 @@ import { isBuiltinSpecifier, parsePackageSpecifier, type PackageSpecifier } from
 import { transpileMdxEsm } from "../document/typescript.ts";
 import remarkGfm from "remark-gfm";
 import { normalizeInlineStyles } from "../document/inline-style.ts";
+import { remarkMermaid } from "../render/mermaid.ts";
 
 interface SyntaxNode {
   type?: string;
@@ -63,14 +64,14 @@ function collectSpecifiers(root: unknown): DiscoveredSpecifier[] {
   return specifiers;
 }
 
-async function parseModule(path: string, mdxBody?: string): Promise<DiscoveredSpecifier[]> {
+async function parseModule(path: string, features: Set<string>, mdxBody?: string): Promise<DiscoveredSpecifier[]> {
   let code: string;
   if (mdxBody !== undefined || extname(path).toLowerCase() === ".mdx") {
     const source = normalizeInlineStyles(transpileMdxEsm(mdxBody ?? (await Bun.file(path).text()), path));
     try {
       code = String(await compile(
         { value: source, path },
-        { outputFormat: "program", development: false, jsx: true, remarkPlugins: [remarkGfm] },
+        { outputFormat: "program", development: false, jsx: true, remarkPlugins: [remarkGfm, [remarkMermaid, { features }]] },
       ));
     } catch (cause) {
       throw new MdxxError("INVALID_MDX", `could not compile ${path}`, { cause });
@@ -100,13 +101,14 @@ export async function discoverImports(documentPath: string, mdxBody: string): Pr
   const assets = new Set<string>();
   const styles = new Set<string>();
   const remoteUrls = new Set<string>();
+  const features = new Set<string>();
 
   while (pending.length > 0) {
     const current = pending.shift();
     if (!current || visited.has(current.path)) continue;
     visited.add(current.path);
 
-    for (const discovered of await parseModule(current.path, current.body)) {
+    for (const discovered of await parseModule(current.path, features, current.body)) {
       const specifier = discovered.value;
       if (/^https?:\/\//.test(specifier)) {
         throw new MdxxError("FORBIDDEN_IMPORT", `remote code import is not supported: ${specifier}`);
@@ -142,5 +144,6 @@ export async function discoverImports(documentPath: string, mdxBody: string): Pr
     assets: [...assets].sort(byText),
     styles: [...styles].sort(byText),
     remoteUrls: [...remoteUrls].sort(byText),
+    features: [...features].sort(byText),
   };
 }

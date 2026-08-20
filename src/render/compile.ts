@@ -5,6 +5,7 @@ import type { AssetReference } from "../assets/discover.ts";
 import { transpileMdxEsm } from "../document/typescript.ts";
 import remarkGfm from "remark-gfm";
 import { normalizeInlineStyles } from "../document/inline-style.ts";
+import { remarkMermaid } from "./mermaid.ts";
 
 function rewriteReferences(path: string, source: string, references: AssetReference[], urls: Map<string, string>): string {
   let result = source;
@@ -45,7 +46,7 @@ export async function compileMdx(
           jsxRuntime: "automatic",
           jsxImportSource: "react",
           development: false,
-          remarkPlugins: [remarkGfm],
+          remarkPlugins: [remarkGfm, remarkMermaid],
         },
       ),
     );

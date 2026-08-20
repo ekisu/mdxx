@@ -35,7 +35,7 @@ test("does not execute document code while building", async () => {
   }
 }, 30_000);
 
-test("keeps Mermaid fences as ordinary code", async () => {
+test("transforms Mermaid fences and includes the browser renderer", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const document = join(directory, "diagram.mdx");
   try {
@@ -43,7 +43,10 @@ test("keeps Mermaid fences as ordinary code", async () => {
     await build(document, { output: join(directory, "output") });
     const entry = (await Array.fromAsync(new Bun.Glob("assets/client-*.js").scan({ cwd: join(directory, "output") })))[0];
     expect(entry).toBeDefined();
-    expect(await Bun.file(join(directory, "output", entry!)).text()).toContain("language-mermaid");
+    const files = await Array.fromAsync(new Bun.Glob("assets/*.js").scan({ cwd: join(directory, "output"), onlyFiles: true }));
+    const javascript = await Promise.all(files.map((path) => Bun.file(join(directory, "output", path)).text()));
+    expect(javascript.join("\n")).toContain("mdxx-mermaid");
+    expect(javascript.join("\n")).not.toContain("language-mermaid");
   } finally {
     await Bun.$`rm -rf ${directory}`;
   }

@@ -1,5 +1,6 @@
 export const REACT_VERSION = "19.2.8";
 export const REACT_DOM_VERSION = "19.2.8";
+export const MERMAID_VERSION = "11.16.1";
 
 export const reactRuntime = {
   react: REACT_VERSION,

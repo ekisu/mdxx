@@ -13,7 +13,7 @@ export async function verify(path: string): Promise<void> {
   const graph = await discoverImports(path, document.body);
   await discoverAssets(path, document.body, graph);
   if (document.lock) {
-    const prepared = await prepareDependencies(graph.packages, document.lock);
+    const prepared = await prepareDependencies(graph.packages, document.lock, graph.features);
     await prepared.environment.dispose();
   }
 }

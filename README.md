@@ -58,7 +58,7 @@ mdxx:
 
 JavaScript and TypeScript components can be declared inline or imported from relative modules. Bare npm imports are resolved in an isolated generated application with explicit React dependencies; local images and CSS are content-addressed in the build output.
 
-GitHub Flavored Markdown is supported, including tables and task lists. The generated HTML is an initially empty shell; the document mounts as a conventional client-side React application. Fenced `mermaid` content is ordinary code until diagram support is designed independently.
+GitHub Flavored Markdown is supported, including tables and task lists. Fenced `mermaid` blocks are rendered as diagrams in the browser. The generated HTML is an initially empty shell, and the document mounts as a conventional client-side React application.
 
 ## Commands
 
