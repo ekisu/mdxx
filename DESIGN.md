@@ -135,9 +135,13 @@ export function Metric({label, value}: MetricProps) {
 Unlocked execution follows Bun's auto-install model:
 
 1. Discover bare package imports in the MDX and local module graph.
-2. Resolve missing packages in an isolated package environment.
-3. Store downloaded packages in a shared content cache.
-4. Compile and bundle the MDX using that environment.
+2. Resolve missing packages provisionally in an isolated package environment.
+3. Select one React and React DOM version satisfying the renderer's supported ranges and every non-optional package constraint.
+4. Resolve the final graph with that exact runtime enforced as a singleton.
+5. Store downloaded packages in a shared content cache.
+6. Compile and bundle the MDX using that environment.
+
+React and React DOM are a coupled, renderer-provided singleton capability. The resolver selects the newest common version present in the provisional graph that satisfies the renderer, authored selectors, ordinary dependency ranges, and non-optional peer ranges. It then materializes that version as an exact root dependency and override. If no common version satisfies every constraint, resolution fails with the originating package constraints rather than allowing multiple runtime identities or assuming undeclared version compatibility.
 
 The cache is an optimization, not part of the document's reproducibility contract.
 
@@ -153,7 +157,7 @@ Locking is optional. `mdxx lock document.mdx` appends or replaces a generated JS
   "sourceDigest": "sha256-...",
   "resolver": {
     "name": "mdxx",
-    "version": "0.2.0"
+    "version": "0.2.1"
   },
   "target": {
     "runtime": "node",
@@ -183,6 +187,7 @@ The lock records:
 - The complete resolved package graph.
 - Exact versions and package integrity hashes.
 - Peer and optional dependency decisions.
+- The selected React singleton and the versioned policy used to reconcile it.
 - Runtime target and module resolution conditions.
 - Resolver information needed to diagnose incompatibilities.
 - A digest of the author-owned source.
@@ -265,7 +270,7 @@ Deterministic generation also requires:
 
 The initial renderer compiles JavaScript or TypeScript MDX into a client application and mounts it in the browser. It does not import or execute document modules to produce initial HTML. TypeScript is transpiled without type-checking during the build; a separate validation command may report type errors.
 
-The mdxx major version defines the MDX compiler, TypeScript transform, React runtime, HTML serializer, bundler, and module resolution behavior. The selected React and React DOM versions are materialized as explicit dependencies in the generated document application so package peer dependencies resolve through a conventional dependency tree. They are part of the resolved build graph even though authors do not need to declare them separately.
+The mdxx major version defines the MDX compiler, TypeScript transform, supported React runtime range, HTML serializer, bundler, and module resolution behavior. Each document graph negotiates one exact, matching React and React DOM version within that range. The selected versions are materialized as explicit dependencies and singleton overrides in the generated document application, then recorded in the embedded lock. This preserves one runtime identity while allowing component packages with narrower compatible requirements; authors do not need to declare the runtime separately.
 
 The initial and default `interactive` profile:
 

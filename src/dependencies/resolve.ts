@@ -7,8 +7,8 @@ import { MdxxError } from "../shared/errors.ts";
 import { canonicalJson } from "../shared/canonical-json.ts";
 import { parseBunLock, type ResolvedPackage } from "./bun-lock.ts";
 import type { DependencyEnvironment } from "./environment.ts";
-import { satisfies, validRange } from "semver";
-import { MERMAID_VERSION, REACT_DOM_VERSION, REACT_VERSION, reactRuntime } from "../render/runtime.ts";
+import { rcompare, satisfies, validRange } from "semver";
+import { MERMAID_VERSION, REACT_DOM_RANGE, REACT_RANGE } from "../render/runtime.ts";
 import { MDXX_VERSION } from "../version.ts";
 
 export interface LockedRoot extends PackageSpecifier {
@@ -18,7 +18,8 @@ export interface LockedRoot extends PackageSpecifier {
 export interface DependencyLock extends EmbeddedLock {
   roots: LockedRoot[];
   packages: ResolvedPackage[];
-  react: typeof reactRuntime;
+  react: ReactRuntime;
+  runtimePolicy: typeof REACT_RUNTIME_POLICY;
   features?: string[];
   peers: PeerDecision[];
   resolver: {
@@ -43,11 +44,27 @@ export interface PeerDecision {
   optional: boolean;
 }
 
-const RUNTIME_VERSIONS = new Map([["react", REACT_VERSION], ["react-dom", REACT_DOM_VERSION]]);
+export interface ReactRuntime {
+  react: string;
+  reactDom: string;
+}
+
+interface RuntimeConstraint {
+  package: "react" | "react-dom";
+  range: string;
+  source: string;
+}
+
+const REACT_RUNTIME_POLICY = { name: "react", strategy: "negotiated-singleton-override", version: 1 } as const;
+const RUNTIME_RANGES = new Map([["react", REACT_RANGE], ["react-dom", REACT_DOM_RANGE]]);
 
 function isDependencyLock(lock: EmbeddedLock): lock is DependencyLock {
   if (!Array.isArray(lock.roots) || !Array.isArray(lock.packages) || !Array.isArray(lock.peers) || (lock.features !== undefined && !Array.isArray(lock.features)) || lock.target === null || typeof lock.target !== "object") return false;
-  if (canonicalJson(lock.react) !== canonicalJson(reactRuntime)) return false;
+  if (canonicalJson(lock.runtimePolicy) !== canonicalJson(REACT_RUNTIME_POLICY)) return false;
+  if (lock.react === null || typeof lock.react !== "object") return false;
+  const react = lock.react as Record<string, unknown>;
+  if (typeof react.react !== "string" || typeof react.reactDom !== "string" || react.react !== react.reactDom) return false;
+  if (!satisfies(react.react, REACT_RANGE) || !satisfies(react.reactDom, REACT_DOM_RANGE)) return false;
   if (lock.resolver === null || typeof lock.resolver !== "object") return false;
   const resolver = lock.resolver as Record<string, unknown>;
   if (resolver.name !== "mdxx" || resolver.version !== MDXX_VERSION) return false;
@@ -55,22 +72,38 @@ function isDependencyLock(lock: EmbeddedLock): lock is DependencyLock {
     lock.packages.every((item) => item !== null && typeof item === "object");
 }
 
-function requestedDependencies(packages: PackageSpecifier[], features: string[], lock?: DependencyLock): Record<string, string> {
-  const result: Record<string, string> = { react: REACT_VERSION, "react-dom": REACT_DOM_VERSION };
+function requestedDependencies(packages: PackageSpecifier[], features: string[], runtime?: ReactRuntime): Record<string, string> {
+  const result: Record<string, string> = {
+    react: runtime?.react ?? REACT_RANGE,
+    "react-dom": runtime?.reactDom ?? REACT_DOM_RANGE,
+  };
   if (features.includes("mermaid")) result.mermaid = MERMAID_VERSION;
   for (const specifier of packages) {
-    const runtimeVersion = RUNTIME_VERSIONS.get(specifier.name);
-    if (runtimeVersion) {
-      if (specifier.selector !== "latest" && (!validRange(specifier.selector) || !satisfies(runtimeVersion, specifier.selector))) {
+    const runtimeRange = RUNTIME_RANGES.get(specifier.name);
+    if (runtimeRange) {
+      if (specifier.selector !== "latest" && !validRange(specifier.selector)) {
+        throw new MdxxError("INCOMPATIBLE_REACT_RUNTIME", `${specifier.original} is not a supported semver React selector`);
+      }
+      if (runtime) {
+        const version = specifier.name === "react" ? runtime.react : runtime.reactDom;
+        if (specifier.selector !== "latest" && !satisfies(version, specifier.selector)) {
+          throw new MdxxError(
+            "INCOMPATIBLE_REACT_RUNTIME",
+            `${specifier.original} is incompatible with the selected ${specifier.name} ${version}`,
+          );
+        }
+      } else if (specifier.selector !== "latest") {
+        result[specifier.name] = `${runtimeRange} ${specifier.selector}`;
+      }
+      if (runtime && !satisfies(specifier.name === "react" ? runtime.react : runtime.reactDom, runtimeRange)) {
         throw new MdxxError(
           "INCOMPATIBLE_REACT_RUNTIME",
-          `${specifier.original} is incompatible with the selected ${specifier.name} ${runtimeVersion}`,
+          `${specifier.original} is incompatible with mdxx's supported ${specifier.name} range ${runtimeRange}`,
         );
       }
       continue;
     }
-    const lockedRoot = lock?.roots.find((root) => root.original === specifier.original);
-    const request = lockedRoot?.selector ?? specifier.selector;
+    const request = specifier.selector;
     const previous = result[specifier.name];
     if (previous !== undefined && previous !== request) {
       throw new MdxxError("CONFLICTING_PACKAGE", `conflicting selectors for ${specifier.name}: ${previous} and ${request}`);
@@ -78,6 +111,48 @@ function requestedDependencies(packages: PackageSpecifier[], features: string[],
     result[specifier.name] = request;
   }
   return result;
+}
+
+function runtimeConstraints(packages: ResolvedPackage[], roots: PackageSpecifier[]): RuntimeConstraint[] {
+  const constraints: RuntimeConstraint[] = [
+    { package: "react", range: REACT_RANGE, source: "mdxx interactive renderer" },
+    { package: "react-dom", range: REACT_DOM_RANGE, source: "mdxx interactive renderer" },
+  ];
+  for (const root of roots) {
+    if ((root.name === "react" || root.name === "react-dom") && root.selector !== "latest") {
+      constraints.push({ package: root.name, range: root.selector, source: root.original });
+    }
+  }
+  for (const item of packages) {
+    if (item.name === "react" || item.name === "react-dom") continue;
+    for (const name of ["react", "react-dom"] as const) {
+      for (const dependencies of [item.dependencies, item.optionalDependencies]) {
+        const range = dependencies[name];
+        if (range) constraints.push({ package: name, range, source: `${item.name}@${item.version} dependency` });
+      }
+      const peer = item.peerDependencies[name];
+      if (peer && !item.optionalPeers.includes(name)) {
+        constraints.push({ package: name, range: peer, source: `${item.name}@${item.version} peer` });
+      }
+    }
+  }
+  return constraints;
+}
+
+export function selectReactRuntime(packages: ResolvedPackage[], roots: PackageSpecifier[] = []): ReactRuntime {
+  const constraints = runtimeConstraints(packages, roots);
+  const candidates = new Set(packages.filter((item) => item.name === "react").map((item) => item.version));
+  const domVersions = new Set(packages.filter((item) => item.name === "react-dom").map((item) => item.version));
+  const compatible = [...candidates]
+    .filter((version) => domVersions.has(version))
+    .filter((version) => constraints.every((constraint) => validRange(constraint.range) && satisfies(version, constraint.range)))
+    .sort(rcompare);
+  const selected = compatible[0];
+  if (!selected) {
+    const details = constraints.map((item) => `${item.source} requires ${item.package} ${item.range}`).join("; ");
+    throw new MdxxError("INCOMPATIBLE_REACT_RUNTIME", `no single supported React runtime satisfies the dependency graph: ${details}`);
+  }
+  return { react: selected, reactDom: selected };
 }
 
 async function install(directory: string, frozen = false): Promise<{ packages: ResolvedPackage[]; lockSource: string }> {
@@ -144,13 +219,13 @@ export function assertCompatibleTarget(lock: DependencyLock): void {
   }
 }
 
-function peerDecisions(packages: ResolvedPackage[]): PeerDecision[] {
+function peerDecisions(packages: ResolvedPackage[], runtime: ReactRuntime): PeerDecision[] {
   const decisions: PeerDecision[] = [];
   for (const item of packages) {
     for (const peer of ["react", "react-dom"] as const) {
       const range = item.peerDependencies[peer];
       if (!range) continue;
-      const version = peer === "react" ? REACT_VERSION : REACT_DOM_VERSION;
+      const version = peer === "react" ? runtime.react : runtime.reactDom;
       const optional = item.optionalPeers.includes(peer);
       if (!optional && (!validRange(range) || !satisfies(version, range))) {
         throw new MdxxError(
@@ -190,8 +265,18 @@ export async function prepareDependencies(
 
   const directory = await mkdtemp(join(tmpdir(), "mdxx-deps-"));
   try {
-    const dependencies = requestedDependencies(packages, features, locked);
-    await Bun.write(join(directory, "package.json"), canonicalJson({ name: "mdxx-app", private: true, dependencies }));
+    let runtime = locked?.react;
+    if (!runtime) {
+      const provisionalDependencies = requestedDependencies(packages, features);
+      await Bun.write(join(directory, "package.json"), canonicalJson({ name: "mdxx-app", private: true, dependencies: provisionalDependencies }));
+      const provisional = await install(directory);
+      runtime = selectReactRuntime(provisional.packages, packages);
+      await rm(join(directory, "node_modules"), { recursive: true, force: true });
+      await rm(join(directory, "bun.lock"), { force: true });
+    }
+    const dependencies = requestedDependencies(packages, features, runtime);
+    const overrides = { react: runtime.react, "react-dom": runtime.reactDom };
+    await Bun.write(join(directory, "package.json"), canonicalJson({ name: "mdxx-app", private: true, dependencies, overrides }));
     if (locked) {
       const state = locked.resolver.state;
       if (state?.format !== "bun-lock-v1" || typeof state.contents !== "string") {
@@ -203,7 +288,7 @@ export async function prepareDependencies(
     const resolved = installation.packages;
     if (locked) verifyLockedPackages(resolved, locked.packages);
     assertSingleReactRuntime(resolved);
-    const peers = peerDecisions(resolved);
+    const peers = peerDecisions(resolved, runtime);
     if (locked && canonicalJson(peers) !== canonicalJson(locked.peers)) {
       throw new MdxxError("LOCK_MISMATCH", "installed peer dependency decisions do not match the embedded lock");
     }
@@ -224,7 +309,8 @@ export async function prepareDependencies(
       lock: {
         roots,
         packages: resolved,
-        react: reactRuntime,
+        react: runtime,
+        runtimePolicy: REACT_RUNTIME_POLICY,
         features,
         peers,
         resolver: {

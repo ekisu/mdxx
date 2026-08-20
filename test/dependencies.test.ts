@@ -6,7 +6,8 @@ import { lock } from "../src/commands/lock.ts";
 import { parseDocument } from "../src/document/parse.ts";
 import { appendEmbeddedLock, type EmbeddedLock } from "../src/document/embedded-lock.ts";
 import { verify } from "../src/commands/verify.ts";
-import { prepareDependencies } from "../src/dependencies/resolve.ts";
+import { prepareDependencies, selectReactRuntime } from "../src/dependencies/resolve.ts";
+import type { ResolvedPackage } from "../src/dependencies/bun-lock.ts";
 import { parsePackageSpecifier } from "../src/imports/specifier.ts";
 
 test("parses Bun package tuples into a stable internal graph", () => {
@@ -29,6 +30,28 @@ test("parses Bun package tuples into a stable internal graph", () => {
       optionalPeers: [],
     },
   ]);
+});
+
+test("negotiates one exact React runtime from transitive constraints", () => {
+  const packageEntry = (name: string, version: string, dependencies: Record<string, string> = {}): ResolvedPackage => ({
+    locator: `${name}@${version}`,
+    name,
+    version,
+    resolution: `npm:${name}@${version}`,
+    integrity: "sha512-test",
+    dependencies,
+    optionalDependencies: {},
+    peerDependencies: {},
+    optionalPeers: [],
+  });
+  const packages = [
+    packageEntry("react", "19.2.7"),
+    packageEntry("react", "19.2.8"),
+    packageEntry("react-dom", "19.2.7"),
+    packageEntry("react-dom", "19.2.8"),
+    packageEntry("component-library", "1.0.0", { react: "19.2.7", "react-dom": "19.2.7" }),
+  ];
+  expect(selectReactRuntime(packages)).toEqual({ react: "19.2.7", reactDom: "19.2.7" });
 });
 
 test("locks and renders an exact package selector", async () => {
@@ -54,7 +77,10 @@ import escape from 'escape-html@1.0.3'
     expect(await Bun.file(join(directory, "output", entry!)).text()).toContain('"<locked>"');
 
     const parsed = parseDocument(await Bun.file(document).text());
-    expect(parsed.lock?.react).toEqual({ react: "19.2.8", reactDom: "19.2.8" });
+    const runtime = parsed.lock?.react as { react?: string; reactDom?: string };
+    expect(runtime.react).toBe(runtime.reactDom);
+    expect(runtime.react).toMatch(/^19\.2\./);
+    expect(parsed.lock?.runtimePolicy).toEqual({ name: "react", strategy: "negotiated-singleton-override", version: 1 });
     expect(parsed.lock?.features).toEqual([]);
     expect(Array.isArray(parsed.lock?.peers)).toBe(true);
     const tampered = structuredClone(parsed.lock) as EmbeddedLock;
@@ -87,6 +113,6 @@ test("processes CSS from a versioned package subpath", async () => {
 
 test("rejects package peers incompatible with the selected React runtime", async () => {
   await expect(prepareDependencies([parsePackageSpecifier("react-test-renderer@16.14.0")])).rejects.toThrow(
-    "requires react ^16.14.0, but mdxx selected 19.2.8",
+    "react-test-renderer@16.14.0 peer requires react ^16.14.0",
   );
 }, 30_000);

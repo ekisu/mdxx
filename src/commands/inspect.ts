@@ -3,7 +3,7 @@ import { discoverImports } from "../imports/discover.ts";
 import { readDocument } from "../shared/paths.ts";
 import { discoverAssets } from "../assets/discover.ts";
 import { currentTarget } from "../dependencies/resolve.ts";
-import { reactRuntime } from "../render/runtime.ts";
+import { reactRuntimeSupport } from "../render/runtime.ts";
 
 export async function inspect(path: string): Promise<Record<string, unknown>> {
   const document = parseDocument(await readDocument(path));
@@ -30,7 +30,7 @@ export async function inspect(path: string): Promise<Record<string, unknown>> {
     remoteUrls: assets.remoteUrls,
     client: {
       target: currentTarget(),
-      react: reactRuntime,
+      react: document.lock?.react ?? reactRuntimeSupport,
       features: graph.features,
       browserAssets: [...assets.files, ...assets.styles],
       chunks: "emitted during build",

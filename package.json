@@ -1,6 +1,6 @@
 {
   "name": "@ekisu/mdxx",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Render reproducible, interactive HTML from self-describing MDX documents",
   "license": "MIT",
   "module": "src/index.ts",
