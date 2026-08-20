@@ -2,7 +2,7 @@ import { parseDocument } from "../document/parse.ts";
 import { discoverImports } from "../imports/discover.ts";
 import { MdxxError } from "../shared/errors.ts";
 import { readDocument } from "../shared/paths.ts";
-import { prepareDependencies } from "../dependencies/resolve.ts";
+import { prepareDependencies, verifyPackageImports, type LockedRoot } from "../dependencies/resolve.ts";
 import { discoverAssets } from "../assets/discover.ts";
 
 export async function verify(path: string): Promise<void> {
@@ -14,6 +14,10 @@ export async function verify(path: string): Promise<void> {
   await discoverAssets(path, document.body, graph);
   if (document.lock) {
     const prepared = await prepareDependencies(graph.packages, document.lock, graph.features);
-    await prepared.environment.dispose();
+    try {
+      await verifyPackageImports(graph.packages, prepared.environment, prepared.lock.roots as LockedRoot[]);
+    } finally {
+      await prepared.environment.dispose();
+    }
   }
 }

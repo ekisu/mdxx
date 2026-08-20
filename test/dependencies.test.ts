@@ -111,6 +111,23 @@ test("processes CSS from a versioned package subpath", async () => {
   }
 }, 30_000);
 
+test("verify rejects a locked package subpath that the browser cannot resolve", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "missing-export.mdx");
+  try {
+    await Bun.write(
+      document,
+      "---\nmdxx:\n  format: 1\n---\n\nimport 'escape-html@1.0.3/missing-export'\n\n# Missing export\n",
+    );
+    await lock(document);
+    await expect(verify(document)).rejects.toThrow(
+      "escape-html@1.0.3/missing-export (escape-html@1.0.3) is not available for the browser/import/default conditions",
+    );
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
 test("rejects package peers incompatible with the selected React runtime", async () => {
   await expect(prepareDependencies([parsePackageSpecifier("react-test-renderer@16.14.0")])).rejects.toThrow(
     "react-test-renderer@16.14.0 peer requires react ^16.14.0",
