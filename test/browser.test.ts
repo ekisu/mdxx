@@ -161,6 +161,51 @@ import {PieChart} from 'react-minimal-pie-chart@9.1.2'
   }
 }, 60_000);
 
+test("runs LikeC4 fromSource without dropping Zod helpers", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "likec4.mdx");
+  try {
+    await Bun.write(
+      document,
+      `---
+mdxx:
+  format: 1
+---
+
+import {fromSource} from '@likec4/language-services@1.59.2/browser'
+
+export const source = \`specification { element actor }
+model { actor user 'User' }
+views { view index { include * } }\`
+export const likec4 = await fromSource(source)
+export const model = await likec4.computedModel()
+export const viewIds = [...model.views()].map(view => view.id).join(', ')
+
+# LikeC4 fromSource
+
+Views: {viewIds}
+`,
+    );
+    const session = await startRun(document);
+    try {
+      const process = Bun.spawn(
+        [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--enable-logging=stderr", "--virtual-time-budget=5000", "--dump-dom", session.url],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      const [code, html, stderr] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
+      expect(code).toBe(0);
+      if (!html.includes("<h1>LikeC4 fromSource</h1>")) throw new Error(`LikeC4 did not render:\n${stderr}`);
+      expect(html).toContain("<h1>LikeC4 fromSource</h1>");
+      expect(html).toContain("Views: index");
+      expect(html).not.toContain("data-mdxx-error");
+    } finally {
+      await session.close();
+    }
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 90_000);
+
 test("serves static dynamic-import chunks", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const document = join(directory, "dynamic.mdx");
