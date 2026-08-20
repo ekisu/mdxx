@@ -8,7 +8,7 @@ import { canonicalJson } from "../shared/canonical-json.ts";
 import { parseBunLock, type ResolvedPackage } from "./bun-lock.ts";
 import type { DependencyEnvironment } from "./environment.ts";
 import { rcompare, satisfies, validRange } from "semver";
-import { MERMAID_VERSION, REACT_DOM_RANGE, REACT_RANGE } from "../render/runtime.ts";
+import { BROWSER_CONDITIONS, MERMAID_VERSION, REACT_DOM_RANGE, REACT_RANGE } from "../render/runtime.ts";
 import { MDXX_VERSION } from "../version.ts";
 
 export interface LockedRoot extends PackageSpecifier {
@@ -204,6 +204,41 @@ export function currentTarget(): DependencyLock["target"] {
     architecture: process.arch,
     conditions: ["browser", "default", "import"],
   };
+}
+
+export async function verifyPackageImports(
+  packages: PackageSpecifier[],
+  environment: DependencyEnvironment,
+  roots: LockedRoot[],
+): Promise<void> {
+  for (const [index, item] of packages.entries()) {
+    const runtimeSpecifier = `${item.name}${item.subpath}`;
+    const entry = join(environment.directory, `.mdxx-verify-${index}.js`);
+    await Bun.write(entry, `import ${JSON.stringify(runtimeSpecifier)};\n`);
+    const result = await Bun.build({
+      entrypoints: [entry],
+      target: "browser",
+      format: "esm",
+      packages: "bundle",
+      conditions: BROWSER_CONDITIONS,
+      plugins: [{
+        name: "mdxx-verify-package-import",
+        setup(builder) {
+          builder.onLoad({ filter: /[\\/]node_modules[\\/]/ }, () => ({ contents: "", loader: "js" }));
+        },
+      }],
+      throw: false,
+    });
+    if (!result.success) {
+      const version = roots.find((root) => root.original === item.original)?.version;
+      const lockedPackage = `${item.name}${version ? `@${version}` : ""}`;
+      const details = result.logs.map((log) => log.message).join("\n");
+      throw new MdxxError(
+        "PACKAGE_EXPORT_NOT_FOUND",
+        `${item.original} (${lockedPackage}) is not available for the ${BROWSER_CONDITIONS.join("/")} conditions${details ? `: ${details}` : ""}`,
+      );
+    }
+  }
 }
 
 export function assertCompatibleTarget(lock: DependencyLock): void {

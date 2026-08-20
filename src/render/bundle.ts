@@ -5,6 +5,7 @@ import { clientEntry } from "./client-entry.ts";
 import { mdxPlugin } from "./compile.ts";
 import type { EmittedAssets } from "../assets/emit.ts";
 import { sha256 } from "../shared/digest.ts";
+import { BROWSER_CONDITIONS } from "./runtime.ts";
 
 export interface BrowserArtifact {
   path: string;
@@ -82,11 +83,16 @@ function assetPlugin(assets?: EmittedAssets): Bun.BunPlugin {
     setup(builder) {
       if (!assets) return;
       builder.onResolve({ filter: /^https:\/\/mdxx\.invalid\// }, ({ path }) => ({ path, external: true }));
-      builder.onResolve({ filter: /^\.?\.?\// }, ({ path, importer }) => {
-        const reference = assets.references.find((item) => item.importer === importer && item.specifier === path && item.resolved);
-        if (!reference?.resolved || !assets.urls.has(reference.resolved)) return undefined;
-        return { path: reference.resolved, namespace: "mdxx-asset" };
-      });
+      const specifiers = [...new Set(assets.references.filter((item) => item.resolved && assets.urls.has(item.resolved)).map((item) => item.specifier))];
+      if (specifiers.length > 0) {
+        const escaped = specifiers.map((specifier) => specifier.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"));
+        // Broad fallthrough hooks can drop live bindings: https://github.com/oven-sh/bun/issues/29445
+        builder.onResolve({ filter: new RegExp(`^(?:${escaped.join("|")})$`) }, ({ path, importer }) => {
+          const reference = assets.references.find((item) => item.importer === importer && item.specifier === path && item.resolved);
+          if (!reference?.resolved || !assets.urls.has(reference.resolved)) return undefined;
+          return { path: reference.resolved, namespace: "mdxx-asset" };
+        });
+      }
       builder.onLoad({ filter: /.*/, namespace: "mdxx-asset" }, ({ path }) => ({
         contents: `export default ${JSON.stringify(assets.urls.get(path))}`,
         loader: "js",
@@ -147,7 +153,7 @@ export async function bundleDocument(
     env: "disable",
     sourcemap: "none",
     allowUnresolved: [],
-    conditions: ["browser", "import", "default"],
+    conditions: BROWSER_CONDITIONS,
     plugins: [assetPlugin(capsule.assets), mdxPlugin(capsule.assets?.references, capsule.assets?.urls)],
     throw: false,
   });
