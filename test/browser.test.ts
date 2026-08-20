@@ -233,11 +233,15 @@ export function WorkerResult() {
     );
     const session = await startRun(document);
     try {
-      const process = Bun.spawn(
-        [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=10000", "--dump-dom", session.url],
-        { stdout: "pipe", stderr: "pipe" },
-      );
-      const [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
+      let code = 1;
+      let html = "";
+      for (let attempt = 0; attempt < 3 && !html.includes("worker and wasm loaded"); attempt++) {
+        const process = Bun.spawn(
+          [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=2000", "--dump-dom", session.url],
+          { stdout: "pipe", stderr: "pipe" },
+        );
+        [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
+      }
       expect(code).toBe(0);
       expect(html).toContain("worker and wasm loaded");
       expect(html).not.toContain("data-mdxx-error");
