@@ -2,6 +2,7 @@ import { describe, expect, test } from "bun:test";
 import { appendEmbeddedLock, extractEmbeddedLock, serializeEmbeddedLock } from "../src/document/embedded-lock.ts";
 import { parseDocument } from "../src/document/parse.ts";
 import { normalizeInlineStyles } from "../src/document/inline-style.ts";
+import { MDXX_VERSION } from "../src/version.ts";
 
 const source = `---
 title: Example
@@ -43,7 +44,7 @@ describe("document parsing", () => {
 
   test("validates the required CLI version", () => {
     expect(() => parseDocument(source.replace("format: 1", 'format: 1\n  requires: "not a range"'))).toThrow("valid semver range");
-    expect(() => parseDocument(source.replace("format: 1", 'format: 1\n  requires: ">=1"'))).toThrow("current version is 0.2.2");
+    expect(() => parseDocument(source.replace("format: 1", 'format: 1\n  requires: ">=1"'))).toThrow(`current version is ${MDXX_VERSION}`);
   });
 
   test("tracks fresh and stale locks", () => {

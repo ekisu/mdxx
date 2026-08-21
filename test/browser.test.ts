@@ -58,6 +58,32 @@ test("renders a Mermaid fence in Chromium", async () => {
   }
 }, 30_000);
 
+test("renders highlighted code without a browser highlighter", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "highlight.mdx");
+  try {
+    await Bun.write(document, "---\nmdxx:\n  format: 1\n---\n\n```css\n:root { color: red; }\n```\n");
+    const session = await startRun(document);
+    try {
+      const process = Bun.spawn(
+        [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--virtual-time-budget=2000", "--dump-dom", session.url],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      const [code, html] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
+      expect(code).toBe(0);
+      expect(html).toContain('class="shiki shiki-themes github-light github-dark"');
+      expect(html).toContain('class="language-css"');
+      expect(html).toContain('class="line"');
+      expect(html).toContain("--shiki-dark");
+      expect(html).not.toContain("data-mdxx-error");
+    } finally {
+      await session.close();
+    }
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
 test("mounts interactive state and responds to input", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const documentPath = join(directory, "counter.mdx");

@@ -1,6 +1,21 @@
 import { expect, test } from "bun:test";
 import { join } from "node:path";
 import { build } from "../src/commands/build.ts";
+import { compileMdx } from "../src/render/compile.ts";
+
+test("highlights recognized code fences and preserves plain fallbacks", async () => {
+  const compiled = await compileMdx(
+    "code.mdx",
+    "---\nmdxx:\n  format: 1\n---\n\n```css\n:root { color: red; }\n```\n\n```not-a-language\nplain <code>\n```\n\n```\nno language\n```\n",
+  );
+
+  expect(compiled).toContain('className: "shiki shiki-themes github-light github-dark"');
+  expect(compiled).toContain('className: "language-css"');
+  expect(compiled).toContain("--shiki-dark");
+  expect(compiled).toContain('className: "language-not-a-language"');
+  expect(compiled).toContain('children: "plain <code>\\n"');
+  expect(compiled).toContain("no language");
+});
 
 test("builds a deterministic client-only HTML shell", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
@@ -15,6 +30,7 @@ test("builds a deterministic client-only HTML shell", async () => {
     expect(first).toContain('<main id="mdxx-root"></main>');
     expect(first).toContain("requires JavaScript");
     expect(first).toContain('<script id="mdxx-data" type="application/json">');
+    expect(first).toContain("@media (prefers-color-scheme: dark)");
     expect(first).toMatch(/<script type="module" src="assets\/client-[a-z0-9]+\.js"><\/script>/);
     expect(first).not.toContain("<h1>Heading</h1>");
     expect(first).not.toContain(directory);

@@ -6,6 +6,7 @@ import { transpileMdxEsm } from "../document/typescript.ts";
 import remarkGfm from "remark-gfm";
 import { normalizeInlineStyles } from "../document/inline-style.ts";
 import { remarkMermaid } from "./mermaid.ts";
+import rehypeShiki from "@shikijs/rehype";
 
 function rewriteReferences(path: string, source: string, references: AssetReference[], urls: Map<string, string>): string {
   let result = source;
@@ -47,6 +48,19 @@ export async function compileMdx(
           jsxImportSource: "react",
           development: false,
           remarkPlugins: [remarkGfm, remarkMermaid],
+          rehypePlugins: [
+            [
+              rehypeShiki,
+              {
+                themes: { light: "github-light", dark: "github-dark" },
+                langs: ["text"],
+                lazy: true,
+                addLanguageClass: true,
+                // Unknown languages remain ordinary MDX code blocks.
+                onError() {},
+              },
+            ],
+          ],
         },
       ),
     );

@@ -28,6 +28,15 @@ export function createHtml({ metadata, scripts, styles }: HtmlInput): string {
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>${escapeHtml(title)}</title>${links ? `\n${links}` : ""}
+<style>@media (prefers-color-scheme: dark) {
+  .shiki, .shiki span {
+    color: var(--shiki-dark) !important;
+    background-color: var(--shiki-dark-bg) !important;
+    font-style: var(--shiki-dark-font-style) !important;
+    font-weight: var(--shiki-dark-font-weight) !important;
+    text-decoration: var(--shiki-dark-text-decoration) !important;
+  }
+}</style>
 </head>
 <body>
 <main id="mdxx-root"></main>

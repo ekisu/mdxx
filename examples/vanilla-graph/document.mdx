@@ -1,6 +1,6 @@
 ---
 title: A small project graph
-description: A self-contained MDX document with an interactive SVG and a Mermaid diagram.
+description: A self-contained MDX document with an interactive SVG, a Mermaid diagram, and highlighted code.
 mdxx:
   format: 1
 ---
@@ -8,12 +8,13 @@ mdxx:
 import {useState} from 'react'
 
 <style>
-:root { font-family: system-ui, sans-serif; color: #222; background: white; }
+:root { color-scheme: light dark; font-family: system-ui, sans-serif; color: light-dark(#222, #e5e7eb); background: light-dark(white, #111827); }
 body { margin: 0; }
 #mdxx-root { max-width: 52rem; margin: 0 auto; padding: 2rem 1rem 4rem; }
 blockquote { margin-left: 0; padding-left: 1rem; border-left: 3px solid #ccc; }
 table { border-collapse: collapse; }
 th, td { padding: .4rem 1.5rem .4rem 0; text-align: left; }
+pre { overflow-x: auto; padding: 1rem; border-radius: .35rem; }
 .mdxx-mermaid { margin: 2rem 0; }
 </style>
 
@@ -112,6 +113,19 @@ The release checklist is intentionally unremarkable:
 - [ ] Complete user review
 - [ ] Prepare the release notes
 
+## Theme excerpt
+
+Fenced source is highlighted during the build and remains readable without a browser highlighter:
+
+```css
+@media (prefers-color-scheme: dark) {
+  :root {
+    --surface: #0f172a;
+    --text: #e5e7eb;
+  }
+}
+```
+
 ## Why this example exists
 
-The heading, prose, quotation, table, checklist, and Mermaid fence above are all Markdown. React is used directly only for the selectable graph and its detail readout. The presentation otherwise uses browser defaults, so the authored document remains easy to read and edit without specialized tooling.
+The heading, prose, quotation, table, checklist, code, and Mermaid fences above are all Markdown. React is used directly only for the selectable graph and its detail readout. The presentation otherwise uses browser defaults, so the authored document remains easy to read and edit without specialized tooling.

@@ -281,6 +281,7 @@ The initial and default `interactive` profile:
 - Rewrites local asset references to copied, content-addressed files.
 - Preserves remote asset URLs.
 - Renders fenced `mermaid` blocks with a pinned, locked browser runtime.
+- Highlights recognized fenced code languages during compilation with built-in light and dark themes, while preserving plain code for unknown or omitted languages.
 - Executes document and component code only in the browser.
 - Does not require components to support server rendering.
 - Embeds frontmatter metadata as canonical data for the client entry.
