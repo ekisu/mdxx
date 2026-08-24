@@ -72,9 +72,14 @@ mdxx build document.mdx --output dist
 mdxx build document.mdx --locked --output dist
 mdxx run document.mdx
 mdxx run document.mdx --locked
+mdxx smoke document.mdx
+mdxx smoke document.mdx --locked --browser /path/to/chromium --timeout 10000
+mdxx smoke document.mdx --json
 ```
 
-`build` creates `<document-name>.html` plus content-addressed browser chunks and assets. It refuses to replace an existing output path. `run` performs the same build in a fresh temporary directory and serves it on `127.0.0.1`.
+`build` creates `<document-name>.html` plus content-addressed browser chunks and assets. It refuses to replace an existing output path. `run` performs the same build in a fresh temporary directory and serves it on `127.0.0.1`. `smoke` builds and serves the document, launches Chromium, and fails unless the runtime reaches its mounted state without browser errors or failed requests. Chromium is selected by `--browser`, then `CHROMIUM_PATH`, then `chromium`; `--json` emits a structured CI result.
+
+The generated `<html>` element exposes `data-mdxx-state="loading|mounting|mounted|error"`. On failure, `data-mdxx-error` and a visible fallback contain the error message, while smoke diagnostics retain the startup phase, stack, and nested causes.
 
 ## Examples
 
