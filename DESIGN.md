@@ -287,7 +287,7 @@ The initial and default `interactive` profile:
 - Embeds frontmatter metadata as canonical data for the client entry.
 - Exposes `data-mdxx-state` on the root element as `loading`, `mounting`, `mounted`, or `error`, with structured startup diagnostics and a visible error fallback.
 
-The shell installs its error and rejection boundary before loading the client module. Document evaluation, including top-level await, therefore cannot fail before mdxx records an error state. The client records `mounting` before the initial React commit and `mounted` after that commit succeeds.
+The shell installs its error and rejection boundary before loading the client module. Document evaluation, including top-level await, therefore cannot fail before mdxx records an error state. The client records `mounting` before the initial React commit and `mounted` after that commit succeeds. Uncaught errors and unhandled rejections during loading or mounting are fatal startup failures with a visible fallback. On reaching `mounted`, mdxx removes the global startup listeners; later browser diagnostics use normal browser handling and do not change the mdxx lifecycle state or replace the rendered document.
 
 The built HTML requires JavaScript to display document content. The shell should include a concise `noscript` explanation, but no fallback rendering is required.
 

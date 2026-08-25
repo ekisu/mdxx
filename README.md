@@ -81,7 +81,7 @@ mdxx smoke document.mdx --json
 
 `build` creates `<document-name>.html` plus content-addressed browser chunks and assets. It refuses to replace an existing output path unless `--replace` is passed. Replacement builds and validates the complete next tree before changing the destination, so a build failure leaves the previous output unchanged and new HTML is never published before its referenced assets. `run` performs the same build in a fresh temporary directory and serves it on `127.0.0.1`. `smoke` builds and serves the document, launches Chromium, and fails unless the runtime reaches its mounted state without browser errors or failed requests. Chromium is selected by `--browser`, then `CHROMIUM_PATH`, then `chromium`; `--json` emits a structured CI result.
 
-The generated `<html>` element exposes `data-mdxx-state="loading|mounting|mounted|error"`. On failure, `data-mdxx-error` and a visible fallback contain the error message, while smoke diagnostics retain the startup phase, stack, and nested causes.
+The generated `<html>` element exposes `data-mdxx-state="loading|mounting|mounted|error"`. Uncaught errors during loading or mounting are fatal: `data-mdxx-error` and a visible fallback contain the error message, while smoke diagnostics retain the startup phase, stack, and nested causes. After the initial React commit reaches `mounted`, mdxx removes its global startup listeners; later browser diagnostics follow normal browser handling and do not replace the rendered document or change its mdxx state.
 
 ## Examples
 

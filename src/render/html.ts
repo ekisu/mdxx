@@ -40,8 +40,16 @@ const startupRuntime = `(() => {
   function state(value) {
     phase = value;
     shell.dataset.mdxxState = value;
+    if (value === "mounted") {
+      removeEventListener("error", onError);
+      removeEventListener("unhandledrejection", onUnhandledRejection);
+    }
   }
   function report(error, errorPhase = phase) {
+    if (phase === "mounted") {
+      console.error("mdxx: browser error after mount", error);
+      return;
+    }
     const diagnostic = details(error);
     shell.dataset.mdxxError = diagnostic.message;
     state("error");
@@ -53,9 +61,15 @@ const startupRuntime = `(() => {
     }
     console.error("mdxx: browser startup failed during " + errorPhase, error);
   }
+  function onError(event) {
+    report(event.error || new Error(event.message || "Browser resource failed to load"));
+  }
+  function onUnhandledRejection(event) {
+    report(event.reason);
+  }
   globalThis.__mdxxRuntime = {report, result, state};
-  addEventListener("error", event => report(event.error || new Error(event.message || "Browser resource failed to load")));
-  addEventListener("unhandledrejection", event => report(event.reason));
+  addEventListener("error", onError);
+  addEventListener("unhandledrejection", onUnhandledRejection);
 })();`;
 
 export function createHtml({ metadata, scripts, styles }: HtmlInput): string {

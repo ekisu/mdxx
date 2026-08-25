@@ -142,6 +142,57 @@ export function Counter() {
   }
 }, 30_000);
 
+test("keeps mounted documents after ResizeObserver diagnostics", async () => {
+  const directory = (await Bun.$`mktemp -d`.text()).trim();
+  const document = join(directory, "resize-observer.mdx");
+  try {
+    await Bun.write(
+      document,
+      `---
+mdxx:
+  format: 1
+---
+
+import {useEffect, useState} from 'react'
+
+export function ResizeObserverFixture() {
+  const [responsive, setResponsive] = useState(false)
+  useEffect(() => {
+    queueMicrotask(() => {
+      dispatchEvent(new ErrorEvent('error', {message: 'ResizeObserver loop completed with undelivered notifications.'}))
+      dispatchEvent(new ErrorEvent('error', {message: 'ResizeObserver loop limit exceeded'}))
+      setResponsive(true)
+    })
+  }, [])
+  return <button>{responsive ? 'still interactive' : 'waiting'}</button>
+}
+
+# ResizeObserver fixture
+
+<ResizeObserverFixture />
+`,
+    );
+    const session = await startRun(document);
+    try {
+      const process = Bun.spawn(
+        [CHROMIUM_PATH, "--headless", "--no-sandbox", "--disable-gpu", "--enable-logging=stderr", "--virtual-time-budget=2000", "--dump-dom", session.url],
+        { stdout: "pipe", stderr: "pipe" },
+      );
+      const [code, html, stderr] = await Promise.all([process.exited, process.stdout.text(), process.stderr.text()]);
+      expect(code).toBe(0);
+      expect(html).toContain('data-mdxx-state="mounted"');
+      expect(html).toContain("<h1>ResizeObserver fixture</h1>");
+      expect(html).toContain("<button>still interactive</button>");
+      expect(html).not.toContain("data-mdxx-error");
+      expect(stderr).not.toContain("mdxx: browser startup failed");
+    } finally {
+      await session.close();
+    }
+  } finally {
+    await Bun.$`rm -rf ${directory}`;
+  }
+}, 30_000);
+
 test("renders React Flow, Visx, and react-minimal-pie-chart through ordinary imports", async () => {
   const directory = (await Bun.$`mktemp -d`.text()).trim();
   const document = join(directory, "visualizations.mdx");
