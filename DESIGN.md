@@ -285,6 +285,9 @@ The initial and default `interactive` profile:
 - Executes document and component code only in the browser.
 - Does not require components to support server rendering.
 - Embeds frontmatter metadata as canonical data for the client entry.
+- Exposes `data-mdxx-state` on the root element as `loading`, `mounting`, `mounted`, or `error`, with structured startup diagnostics and a visible error fallback.
+
+The shell installs its error and rejection boundary before loading the client module. Document evaluation, including top-level await, therefore cannot fail before mdxx records an error state. The client records `mounting` before the initial React commit and `mounted` after that commit succeeds.
 
 The built HTML requires JavaScript to display document content. The shell should include a concise `noscript` explanation, but no fallback rendering is required.
 
@@ -347,6 +350,7 @@ mdxx lock document.mdx
 mdxx unlock document.mdx
 mdxx verify document.mdx
 mdxx inspect document.mdx
+mdxx smoke document.mdx
 ```
 
 - `init` creates a minimal MDX document with mdxx frontmatter.
@@ -356,6 +360,7 @@ mdxx inspect document.mdx
 - `unlock` removes the embedded lock.
 - `verify` checks source and package integrity and confirms that referenced local assets are available.
 - `inspect` reports imports, resolved versions, assets, target conditions, and remote URLs.
+- `smoke` builds, serves, and opens the document in an explicitly selectable Chromium browser, then reports startup and optional document-check results in human-readable or JSON form.
 
 ## Initial Scope
 

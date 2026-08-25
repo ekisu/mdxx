@@ -8,10 +8,12 @@ export interface RunSession {
   close(): Promise<void>;
 }
 
-export async function startRun(path: string, locked = false): Promise<RunSession> {
+export async function startRun(path: string, locked = false, signal?: AbortSignal): Promise<RunSession> {
   const temporary = await mkdtemp(join(tmpdir(), "mdxx-run-"));
   try {
+    if (signal?.aborted) throw new DOMException("Run interrupted", "AbortError");
     const htmlPath = await build(path, { output: join(temporary, "output"), locked });
+    if (signal?.aborted) throw new DOMException("Run interrupted", "AbortError");
     const root = dirname(htmlPath);
     const htmlName = basename(htmlPath);
     const server = Bun.serve({
