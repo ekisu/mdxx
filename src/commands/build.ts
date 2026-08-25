@@ -12,13 +12,54 @@ import { emitAssets } from "../assets/emit.ts";
 export interface BuildOptions {
   output: string;
   locked?: boolean;
+  replace?: boolean;
   onWarning?: (message: string) => void;
+}
+
+async function publish(staging: string, output: string, options: BuildOptions): Promise<void> {
+  if (!options.replace) {
+    await rename(staging, output);
+    return;
+  }
+
+  const backup = `${output}.mdxx-backup-${crypto.randomUUID()}`;
+  let hasBackup = false;
+  try {
+    await rename(output, backup);
+    hasBackup = true;
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
+
+  try {
+    await rename(staging, output);
+  } catch (error) {
+    if (hasBackup) {
+      try {
+        await rename(backup, output);
+        hasBackup = false;
+      } catch (rollbackError) {
+        throw new AggregateError([error, rollbackError], `failed to publish ${output} and restore its previous contents`);
+      }
+    }
+    throw error;
+  }
+
+  if (hasBackup) {
+    try {
+      await rm(backup, { recursive: true });
+    } catch {
+      try {
+        (options.onWarning ?? console.warn)(`mdxx: replaced output but could not remove backup: ${backup}`);
+      } catch {}
+    }
+  }
 }
 
 export async function build(path: string, options: BuildOptions): Promise<string> {
   const documentPath = resolve(path);
   const output = resolve(options.output);
-  if (await pathExists(output)) throw new MdxxError("OUTPUT_EXISTS", `output path already exists: ${options.output}`);
+  if (!options.replace && await pathExists(output)) throw new MdxxError("OUTPUT_EXISTS", `output path already exists: ${options.output}`);
 
   const document = parseDocument(await readDocument(documentPath));
   if (document.lock && !document.lockFresh) throw new MdxxError("STALE_LOCK", "embedded lock does not match the document source");
@@ -47,7 +88,7 @@ export async function build(path: string, options: BuildOptions): Promise<string
     );
     const name = basename(documentPath, extname(documentPath));
     await Bun.write(join(staging, `${name}.html`), html);
-    await rename(staging, output);
+    await publish(staging, output, options);
     return join(output, `${name}.html`);
   } catch (error) {
     await rm(staging, { recursive: true, force: true });

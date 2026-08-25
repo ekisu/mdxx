@@ -345,7 +345,7 @@ Node built-ins, remote code imports, CommonJS `require`, and computed module spe
 ```text
 mdxx init document.mdx
 mdxx run document.mdx
-mdxx build document.mdx --output dist/
+mdxx build document.mdx --output dist/ [--replace]
 mdxx lock document.mdx
 mdxx unlock document.mdx
 mdxx verify document.mdx
@@ -355,7 +355,7 @@ mdxx smoke document.mdx
 
 - `init` creates a minimal MDX document with mdxx frontmatter.
 - `run` auto-installs unresolved package imports if necessary and renders for immediate use.
-- `build` writes deterministic HTML and local assets.
+- `build` writes deterministic HTML and local assets. Existing output is rejected unless `--replace` is passed; replacement stages the complete next tree before safely publishing it and leaves the previous tree unchanged when the build fails.
 - `lock` embeds the complete resolved dependency graph.
 - `unlock` removes the embedded lock.
 - `verify` checks source and package integrity and confirms that referenced local assets are available.

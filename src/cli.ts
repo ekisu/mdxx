@@ -10,7 +10,14 @@ import { smoke } from "./commands/smoke.ts";
 import { canonicalJson } from "./shared/canonical-json.ts";
 import { MdxxError } from "./shared/errors.ts";
 
-const USAGE = "Usage: mdxx <init|run|build|lock|unlock|verify|inspect|smoke> [options] <document.mdx>";
+const USAGE = `Usage: mdxx <init|run|build|lock|unlock|verify|inspect|smoke> [options] <document.mdx>
+
+Build options:
+  --output <path>  Output directory (default: dist)
+  --locked         Require a current embedded lock
+  --replace        Build a complete output tree, then safely replace the destination
+
+Replacement is opt-in. A failed build leaves the existing output unchanged.`;
 
 function documentArgument(args: string[]): string {
   const unknown = args.find((argument) => argument.startsWith("-"));
@@ -49,8 +56,12 @@ export async function main(args: string[]): Promise<number> {
     const lockedIndex = rest.indexOf("--locked");
     const locked = lockedIndex >= 0;
     if (locked) rest.splice(lockedIndex, 1);
+    const replaceIndex = rest.indexOf("--replace");
+    const replace = replaceIndex >= 0;
+    if (replace) rest.splice(replaceIndex, 1);
     if (output !== undefined && command !== "build") throw new MdxxError("USAGE", "--output is only valid for build");
     if (locked && command !== "build" && command !== "run" && command !== "smoke") throw new MdxxError("USAGE", "--locked is only valid for build, run, and smoke");
+    if (replace && command !== "build") throw new MdxxError("USAGE", "--replace is only valid for build");
     if ((browser !== undefined || timeoutValue !== undefined || json) && command !== "smoke") throw new MdxxError("USAGE", "--browser, --timeout, and --json are only valid for smoke");
     const path = documentArgument(rest);
     switch (command) {
@@ -74,7 +85,7 @@ export async function main(args: string[]): Promise<number> {
         console.log(`${path}: valid`);
         break;
       case "build": {
-        const html = await build(path, { output: output ?? "dist", locked });
+        const html = await build(path, { output: output ?? "dist", locked, replace });
         console.log(`Built ${html}`);
         break;
       }
