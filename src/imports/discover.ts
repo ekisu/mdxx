@@ -1,7 +1,7 @@
 import { extname, resolve } from "node:path";
 import { compile } from "@mdx-js/mdx";
 import { parse } from "@babel/parser";
-import { MdxxError } from "../shared/errors.ts";
+import { MdxxError, sourceDiagnostic } from "../shared/errors.ts";
 import { isCodePath, resolveLocalModule } from "../shared/paths.ts";
 import type { ImportGraph, ImportReference } from "./graph.ts";
 import { isBuiltinSpecifier, parsePackageSpecifier, type PackageSpecifier } from "./specifier.ts";
@@ -23,6 +23,11 @@ interface SyntaxNode {
 interface DiscoveredSpecifier {
   value: string;
   worker: boolean;
+}
+
+interface DocumentDiagnosticContext {
+  source: string;
+  bodyLineOffset: number;
 }
 
 function collectSpecifiers(root: unknown): DiscoveredSpecifier[] {
@@ -64,17 +69,29 @@ function collectSpecifiers(root: unknown): DiscoveredSpecifier[] {
   return specifiers;
 }
 
-async function parseModule(path: string, features: Set<string>, mdxBody?: string): Promise<DiscoveredSpecifier[]> {
+async function parseModule(
+  path: string,
+  features: Set<string>,
+  mdxBody?: string,
+  diagnosticContext?: DocumentDiagnosticContext,
+): Promise<DiscoveredSpecifier[]> {
   let code: string;
   if (mdxBody !== undefined || extname(path).toLowerCase() === ".mdx") {
-    const source = normalizeInlineStyles(transpileMdxEsm(mdxBody ?? (await Bun.file(path).text()), path));
+    const authoredSource = mdxBody ?? (await Bun.file(path).text());
+    const diagnosticSource = diagnosticContext?.source ?? authoredSource;
+    const lineOffset = diagnosticContext?.bodyLineOffset ?? 0;
+    const source = normalizeInlineStyles(transpileMdxEsm(authoredSource, path, lineOffset, diagnosticSource));
     try {
       code = String(await compile(
         { value: source, path },
         { outputFormat: "program", development: false, jsx: true, remarkPlugins: [remarkGfm, [remarkMermaid, { features }]] },
       ));
     } catch (cause) {
-      throw new MdxxError("INVALID_MDX", `could not compile ${path}`, { cause });
+      throw new MdxxError("INVALID_MDX", `could not compile ${path}`, {
+        cause,
+        diagnostic: sourceDiagnostic(cause, path, diagnosticSource, lineOffset),
+        help: "Fix the MDX syntax at the highlighted location.",
+      });
     }
   } else {
     code = await Bun.file(path).text();
@@ -88,11 +105,19 @@ async function parseModule(path: string, features: Set<string>, mdxBody?: string
     return collectSpecifiers(ast);
   } catch (cause) {
     if (cause instanceof MdxxError) throw cause;
-    throw new MdxxError("INVALID_MODULE", `could not parse ${path}`, { cause });
+    throw new MdxxError("INVALID_MODULE", `could not parse ${path}`, {
+      cause,
+      diagnostic: sourceDiagnostic(cause, path, code),
+      help: "Fix the module syntax at the highlighted location.",
+    });
   }
 }
 
-export async function discoverImports(documentPath: string, mdxBody: string): Promise<ImportGraph> {
+export async function discoverImports(
+  documentPath: string,
+  mdxBody: string,
+  diagnosticContext?: DocumentDiagnosticContext,
+): Promise<ImportGraph> {
   const entry = resolve(documentPath);
   const pending: Array<{ path: string; body?: string }> = [{ path: entry, body: mdxBody }];
   const visited = new Set<string>();
@@ -108,7 +133,12 @@ export async function discoverImports(documentPath: string, mdxBody: string): Pr
     if (!current || visited.has(current.path)) continue;
     visited.add(current.path);
 
-    for (const discovered of await parseModule(current.path, features, current.body)) {
+    for (const discovered of await parseModule(
+      current.path,
+      features,
+      current.body,
+      current.path === entry ? diagnosticContext : undefined,
+    )) {
       const specifier = discovered.value;
       if (/^https?:\/\//.test(specifier)) {
         throw new MdxxError("FORBIDDEN_IMPORT", `remote code import is not supported: ${specifier}`);
@@ -121,7 +151,11 @@ export async function discoverImports(documentPath: string, mdxBody: string): Pr
       }
       if (specifier.startsWith(".")) {
         const resolved = await resolveLocalModule(current.path, specifier);
-        if (!resolved) throw new MdxxError("MISSING_LOCAL_FILE", `cannot resolve ${specifier} from ${current.path}`);
+        if (!resolved) {
+          throw new MdxxError("MISSING_LOCAL_FILE", `cannot resolve ${specifier} from ${current.path}`, {
+            help: "Add the referenced file or correct the import path.",
+          });
+        }
         const kind = discovered.worker ? "worker" : extname(resolved).toLowerCase() === ".css" ? "style" : isCodePath(resolved) ? "module" : "asset";
         imports.push({ importer: current.path, specifier, kind, resolved });
         if (kind === "module" || kind === "worker") pending.push({ path: resolved });

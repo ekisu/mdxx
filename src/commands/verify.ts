@@ -8,9 +8,11 @@ import { discoverAssets } from "../assets/discover.ts";
 export async function verify(path: string): Promise<void> {
   const document = parseDocument(await readDocument(path));
   if (document.lock && !document.lockFresh) {
-    throw new MdxxError("STALE_LOCK", "embedded lock does not match the document source");
+    throw new MdxxError("STALE_LOCK", "embedded lock does not match the document source", {
+      help: `Run \`mdxx lock ${path}\` to refresh it, or \`mdxx unlock ${path}\` to remove it.`,
+    });
   }
-  const graph = await discoverImports(path, document.body);
+  const graph = await discoverImports(path, document.body, document);
   await discoverAssets(path, document.body, graph);
   if (document.lock) {
     const prepared = await prepareDependencies(graph.packages, document.lock, graph.features);

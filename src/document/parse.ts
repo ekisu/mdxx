@@ -6,6 +6,7 @@ import type { MdxxConfig } from "./schema.ts";
 export interface ParsedDocument {
   source: string;
   body: string;
+  bodyLineOffset: number;
   sourceDigest: string;
   metadata: Record<string, unknown>;
   frontmatter: Record<string, unknown>;
@@ -21,6 +22,7 @@ export function parseDocument(input: string): ParsedDocument {
   return {
     source: extracted.source,
     body: frontmatter.body,
+    bodyLineOffset: frontmatter.bodyLineOffset,
     sourceDigest,
     metadata: frontmatter.metadata,
     frontmatter: frontmatter.all,

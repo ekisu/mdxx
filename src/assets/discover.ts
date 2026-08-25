@@ -83,7 +83,9 @@ export async function discoverAssets(documentPath: string, mdxBody: string, grap
       if (ignoredUrl(specifier)) continue;
       const resolved = resolve(dirname(path), specifier.split(/[?#]/, 1)[0] ?? specifier);
       if (!(await Bun.file(resolved).exists())) {
-        throw new MdxxError("MISSING_LOCAL_ASSET", `cannot resolve asset ${specifier} from ${path}`);
+        throw new MdxxError("MISSING_LOCAL_ASSET", `cannot resolve asset ${specifier} from ${path}`, {
+          help: "Add the referenced asset or correct its path.",
+        });
       }
       references.push({ importer: path, specifier, resolved, remote: false, imported: false });
       if (extname(resolved).toLowerCase() === ".css") {

@@ -1,6 +1,6 @@
 import { compile } from "@mdx-js/mdx";
 import { parseDocument } from "../document/parse.ts";
-import { MdxxError } from "../shared/errors.ts";
+import { MdxxError, sourceDiagnostic } from "../shared/errors.ts";
 import type { AssetReference } from "../assets/discover.ts";
 import { transpileMdxEsm } from "../document/typescript.ts";
 import remarkGfm from "remark-gfm";
@@ -33,8 +33,16 @@ export async function compileMdx(
   let document;
   try {
     document = parseDocument(source);
-    document.body = normalizeInlineStyles(transpileMdxEsm(rewriteReferences(path, document.body, references, urls), path));
+    document.body = normalizeInlineStyles(
+      transpileMdxEsm(
+        rewriteReferences(path, document.body, references, urls),
+        path,
+        document.bodyLineOffset,
+        document.source,
+      ),
+    );
   } catch (cause) {
+    if (cause instanceof MdxxError && (cause.diagnostic || cause.help)) throw cause;
     throw new MdxxError("INVALID_MDX", `could not parse ${path}`, { cause });
   }
 
@@ -65,7 +73,11 @@ export async function compileMdx(
       ),
     );
   } catch (cause) {
-    throw new MdxxError("INVALID_MDX", `could not compile ${path}`, { cause });
+    throw new MdxxError("INVALID_MDX", `could not compile ${path}`, {
+      cause,
+      diagnostic: sourceDiagnostic(cause, path, document.source, document.bodyLineOffset),
+      help: "Fix the MDX syntax at the highlighted location.",
+    });
   }
 }
 

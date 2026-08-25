@@ -4,6 +4,7 @@ import { validateFrontmatter, type FrontmatterData } from "./schema.ts";
 
 export interface ParsedFrontmatter extends FrontmatterData {
   body: string;
+  bodyLineOffset: number;
   raw: string;
 }
 
@@ -24,6 +25,7 @@ export function parseFrontmatter(source: string): ParsedFrontmatter {
   const raw = source.slice(firstBreak + 1, closing.index);
   const bodyStart = closing.index + closing[0].length;
   const body = source.slice(bodyStart).replace(/^\r?\n/, "");
+  const bodyLineOffset = source.slice(0, closing.index).split(/\r?\n/).length;
   const document = parseDocument(raw, {
     schema: "core",
     uniqueKeys: true,
@@ -48,5 +50,5 @@ export function parseFrontmatter(source: string): ParsedFrontmatter {
   }
 
   const data = validateFrontmatter(document.toJS({ maxAliasCount: 0 }));
-  return { ...data, body, raw };
+  return { ...data, body, bodyLineOffset, raw };
 }

@@ -7,7 +7,7 @@ import { atomicWriteIfUnchanged, readDocument } from "../shared/paths.ts";
 export async function lock(path: string): Promise<void> {
   const input = await readDocument(path);
   const document = parseDocument(input);
-  const graph = await discoverImports(path, document.body);
+  const graph = await discoverImports(path, document.body, document);
   const prepared = await prepareDependencies(graph.packages, undefined, graph.features);
   try {
     await atomicWriteIfUnchanged(path, input, appendEmbeddedLock(document.source, { sourceDigest: document.sourceDigest, ...prepared.lock }));

@@ -1,8 +1,8 @@
 import { transformSync } from "@babel/core";
 import transformTypeScript from "@babel/plugin-transform-typescript";
-import { MdxxError } from "../shared/errors.ts";
+import { MdxxError, sourceDiagnostic } from "../shared/errors.ts";
 
-export function transpileMdxEsm(source: string, path: string): string {
+export function transpileMdxEsm(source: string, path: string, lineOffset = 0, diagnosticSource = source): string {
   const lines = source.match(/.*(?:\r?\n|$)/g)?.filter(Boolean) ?? [];
   const output: string[] = [];
   for (let index = 0; index < lines.length;) {
@@ -14,6 +14,7 @@ export function transpileMdxEsm(source: string, path: string): string {
     }
 
     const block: string[] = [];
+    const blockStart = index;
     while (index < lines.length && !/^\s*$/.test(lines[index] ?? "")) {
       block.push(lines[index] ?? "");
       index += 1;
@@ -28,7 +29,11 @@ export function transpileMdxEsm(source: string, path: string): string {
       });
       if (result?.code) output.push(`${result.code}\n`);
     } catch (cause) {
-      throw new MdxxError("INVALID_TYPESCRIPT", `could not transpile MDX ESM in ${path}`, { cause });
+      throw new MdxxError("INVALID_TYPESCRIPT", `could not transpile MDX ESM in ${path}`, {
+        cause,
+        diagnostic: sourceDiagnostic(cause, path, diagnosticSource, lineOffset + blockStart),
+        help: "Fix the TypeScript syntax at the highlighted location.",
+      });
     }
   }
   return output.join("");

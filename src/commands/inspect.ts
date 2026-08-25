@@ -7,7 +7,7 @@ import { reactRuntimeSupport } from "../render/runtime.ts";
 
 export async function inspect(path: string): Promise<Record<string, unknown>> {
   const document = parseDocument(await readDocument(path));
-  const graph = await discoverImports(path, document.body);
+  const graph = await discoverImports(path, document.body, document);
   const assets = await discoverAssets(path, document.body, graph);
   return {
     path,

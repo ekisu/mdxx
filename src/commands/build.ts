@@ -23,7 +23,7 @@ export async function build(path: string, options: BuildOptions): Promise<string
   const document = parseDocument(await readDocument(documentPath));
   if (document.lock && !document.lockFresh) throw new MdxxError("STALE_LOCK", "embedded lock does not match the document source");
   if (options.locked && !document.lock) throw new MdxxError("LOCK_REQUIRED", "--locked requires a current embedded lock");
-  const graph = await discoverImports(documentPath, document.body);
+  const graph = await discoverImports(documentPath, document.body, document);
   const assets = await discoverAssets(documentPath, document.body, graph);
   for (const url of assets.remoteUrls) (options.onWarning ?? console.warn)(`mdxx: remote asset is mutable: ${url}`);
 
