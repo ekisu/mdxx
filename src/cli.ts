@@ -17,6 +17,13 @@ Build options:
   --locked         Require a current embedded lock
   --replace        Build a complete output tree, then safely replace the destination
 
+Smoke options:
+  --browser <path> Browser executable
+  --timeout <ms>   Timeout in milliseconds (default: 10000)
+  --json           Emit a structured result
+
+Browser selection: --browser, CHROMIUM_PATH, standard macOS Chrome or Chromium apps, then chromium on PATH.
+
 Replacement is opt-in. A failed build leaves the existing output unchanged.`;
 
 function documentArgument(args: string[]): string {

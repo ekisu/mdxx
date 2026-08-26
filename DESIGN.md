@@ -360,7 +360,7 @@ mdxx smoke document.mdx
 - `unlock` removes the embedded lock.
 - `verify` checks source and package integrity and confirms that referenced local assets are available.
 - `inspect` reports imports, resolved versions, assets, target conditions, and remote URLs.
-- `smoke` builds, serves, and opens the document in an explicitly selectable Chromium browser, then reports startup and optional document-check results in human-readable or JSON form.
+- `smoke` builds, serves, and opens the document in a Chromium browser selected explicitly, from the environment, from standard macOS Chrome installations, or from `PATH`, then reports startup and optional document-check results in human-readable or JSON form.
 
 ## Initial Scope
 
