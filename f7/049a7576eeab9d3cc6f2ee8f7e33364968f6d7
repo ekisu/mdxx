@@ -1,0 +1,28 @@
+DESIGN.md
+  h_f06c1580a404d7 341-342,356,366-367
+README.md
+  h_f06c1580a404d7 82,87-88,110
+src/cli.ts
+  h_f06c1580a404d7 26-29,65,81,132,138
+src/commands/run.ts
+  h_f06c1580a404d7 20
+src/commands/validate.ts
+  h_f06c1580a404d7 3-4,12,17-116,129-131
+test/options.test.ts
+  h_f06c1580a404d7 12,25,27
+test/run.test.ts
+  h_f06c1580a404d7 16-18
+test/validate.test.ts
+  h_f06c1580a404d7 6,21-37,101-209
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "f7049a7576eeab9d3cc6f2ee8f7e33364968f6d7",
+  "prompts": {},
+  "humans": {
+    "h_f06c1580a404d7": {
+      "author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
