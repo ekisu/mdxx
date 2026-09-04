@@ -1,0 +1,40 @@
+DESIGN.md
+  h_f06c1580a404d7 208,341-342,356,366-367
+README.md
+  h_f06c1580a404d7 80,83-97,120-121
+examples/vanilla-graph/check.js
+  h_f06c1580a404d7 1-10
+src/check/browser.ts
+  h_f06c1580a404d7 1-441
+src/cli.ts
+  h_f06c1580a404d7 10-11,15,27-33,55-65,67,77,90-92,94,136-147,155-160
+src/commands/check.ts
+  h_f06c1580a404d7 1-124
+src/commands/run.ts
+  h_f06c1580a404d7 11-56,63,66,70
+test/check.test.ts
+  h_f06c1580a404d7 1-245
+test/fixtures/check-bootstrap-integrity.js
+  h_f06c1580a404d7 1-7
+test/fixtures/check-document.mdx
+  h_f06c1580a404d7 1-18
+test/fixtures/check-mount-error.mdx
+  h_f06c1580a404d7 1-9
+test/fixtures/check-success.js
+  h_f06c1580a404d7 1-10
+test/fixtures/check-throws.js
+  h_f06c1580a404d7 1-2
+test/fixtures/check-timeout.js
+  h_f06c1580a404d7 1
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "2c6488eb129cb2d791cba155f92b0eb7450c67ae",
+  "prompts": {},
+  "humans": {
+    "h_f06c1580a404d7": {
+      "author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
