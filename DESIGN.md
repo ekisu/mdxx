@@ -205,7 +205,7 @@ Removing the lock restores normal unlocked behavior without changing the authore
 - A stale lock produces an error by default rather than being silently replaced.
 - `mdxx lock` creates or refreshes the lock.
 - `mdxx unlock` removes only the generated lock block.
-- `mdxx run --locked` and `mdxx build --locked` require a current lock and forbid resolution outside it.
+- `mdxx run --locked`, `mdxx build --locked`, `mdxx smoke --locked`, and `mdxx check --locked` require a current lock and forbid resolution outside it.
 - Package bytes must match the recorded integrity before use.
 
 ## Assets
@@ -338,6 +338,8 @@ MDX and arbitrary components execute JavaScript in the browser. The build must p
 
 `mdxx run` serves the generated application on loopback, but loopback is not a security boundary. Document code has the normal authority of browser JavaScript on that origin: it may use browser storage, make network requests allowed by the browser, consume CPU and memory, and inspect content exposed on the page. Untrusted documents should be opened in a dedicated browser profile or stronger external sandbox.
 
+`mdxx check` requires an explicit local probe file and therefore adds a separate caller-controlled trust boundary. It assumes the document and probe are trusted and is not an adversarial sandbox. The probe is an async JavaScript function body executed only after the document reaches `mounted` in a temporary-profile browser. It has access to the rendered page and normal browser APIs. mdxx injects it only into the initial temporary served response, captures native fetch for its token-authenticated callback, and removes the bootstrap immediately; subsequent requests for the document receive the ordinary built artifact. Probe code is not host-executed, added to the built artifact, or retained by `build`, `run`, or `smoke`. Callers must pass only probe files they trust. Probe results are accepted only when they are composed strictly of JSON primitives, plain objects, and dense arrays; values that JSON serialization would omit or transform are rejected.
+
 Node built-ins, remote code imports, CommonJS `require`, and computed module specifiers remain forbidden in authored document code. Static dynamic imports may be supported when the bundler can include their complete output graph deterministically; unresolved or computed dynamic imports remain forbidden.
 
 ## Initial CLI
@@ -351,6 +353,7 @@ mdxx unlock document.mdx
 mdxx verify document.mdx
 mdxx inspect document.mdx
 mdxx smoke document.mdx
+mdxx check document.mdx --probe trusted-local.js
 ```
 
 - `init` creates a minimal MDX document with mdxx frontmatter.
@@ -360,7 +363,8 @@ mdxx smoke document.mdx
 - `unlock` removes the embedded lock.
 - `verify` checks source and package integrity and confirms that referenced local assets are available.
 - `inspect` reports imports, resolved versions, assets, target conditions, and remote URLs.
-- `smoke` builds, serves, and opens the document in a Chromium browser selected explicitly, from the environment, from standard macOS Chrome installations, or from `PATH`, then reports startup and optional document-check results in human-readable or JSON form.
+- `smoke` builds, serves, and opens the document in a Chromium browser selected explicitly, from the environment, from standard macOS Chrome installations, or from `PATH`, then reports startup results in human-readable or JSON form.
+- `check` builds through the normal build path exactly once into a temporary directory, serves that artifact to one temporary-profile Chromium process, waits for `mounted`, and executes the required trusted local probe. The browser posts mount and final results to the loopback server, allowing immediate bounded process termination without waiting for the watchdog timeout. Interrupts and timeouts close the server, terminate Chrome with escalation, remove its temporary profile, and remove the temporary build. The compact result reports setup plus `build`, `mount`, and `probe` phases with browser, console, error, and strictly JSON-safe probe diagnostics.
 
 ## Initial Scope
 

@@ -1,0 +1,9 @@
+---
+title: Mount error fixture
+mdxx:
+  format: 1
+---
+
+export const failure = await Promise.reject(new Error("mount failed", { cause: new Error("mount root cause") }));
+
+# Unreachable

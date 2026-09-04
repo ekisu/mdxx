@@ -8,40 +8,66 @@ export interface RunSession {
   close(): Promise<void>;
 }
 
+export interface ServeOptions {
+  html?: string;
+  htmlOnce?: boolean;
+  fetch?: (request: Request) => Response | undefined | Promise<Response | undefined>;
+}
+
+export function serveOutput(htmlPath: string, options: ServeOptions = {}): RunSession {
+  const root = dirname(htmlPath);
+  const htmlName = basename(htmlPath);
+  let servedHtml = false;
+  const headers = {
+    "Cross-Origin-Opener-Policy": "same-origin",
+    "Referrer-Policy": "no-referrer",
+    "X-Content-Type-Options": "nosniff",
+  };
+  const server = Bun.serve({
+    hostname: "127.0.0.1",
+    port: 0,
+    async fetch(request) {
+      const handled = await options.fetch?.(request);
+      if (handled) return handled;
+      const pathname = decodeURIComponent(new URL(request.url).pathname);
+      const relative = pathname === "/" ? htmlName : pathname.replace(/^\/+/, "");
+      const filePath = resolve(root, relative);
+      if (filePath !== root && !filePath.startsWith(`${root}${sep}`)) return new Response("Not found", { status: 404 });
+      const navigation = request.headers.get("sec-fetch-mode") === "navigate";
+      if (relative === htmlName && options.html !== undefined && navigation && (!options.htmlOnce || !servedHtml)) {
+        servedHtml = true;
+        return new Response(options.html, { headers: { ...headers, "Content-Type": "text/html" } });
+      }
+      const file = Bun.file(filePath);
+      if (!(await file.exists())) return new Response("Not found", { status: 404 });
+      return new Response(file, { headers });
+    },
+  });
+  let closed = false;
+  return {
+    url: `http://${server.hostname}:${server.port}/`,
+    async close() {
+      if (closed) return;
+      closed = true;
+      await server.stop(true);
+    },
+  };
+}
+
 export async function startRun(path: string, locked = false, signal?: AbortSignal): Promise<RunSession> {
   const temporary = await mkdtemp(join(tmpdir(), "mdxx-run-"));
   try {
     if (signal?.aborted) throw new DOMException("Run interrupted", "AbortError");
     const htmlPath = await build(path, { output: join(temporary, "output"), locked });
     if (signal?.aborted) throw new DOMException("Run interrupted", "AbortError");
-    const root = dirname(htmlPath);
-    const htmlName = basename(htmlPath);
-    const server = Bun.serve({
-      hostname: "127.0.0.1",
-      port: 0,
-      async fetch(request) {
-        const pathname = decodeURIComponent(new URL(request.url).pathname);
-        const relative = pathname === "/" ? htmlName : pathname.replace(/^\/+/, "");
-        const filePath = resolve(root, relative);
-        if (filePath !== root && !filePath.startsWith(`${root}${sep}`)) return new Response("Not found", { status: 404 });
-        const file = Bun.file(filePath);
-        if (!(await file.exists())) return new Response("Not found", { status: 404 });
-        return new Response(file, {
-          headers: {
-            "Cross-Origin-Opener-Policy": "same-origin",
-            "Referrer-Policy": "no-referrer",
-            "X-Content-Type-Options": "nosniff",
-          },
-        });
-      },
-    });
+    const served = serveOutput(htmlPath);
     let closed = false;
     return {
-      url: `http://${server.hostname}:${server.port}/`,
+      url: served.url,
       async close() {
         if (closed) return;
         closed = true;
-        await server.stop(true);
+        await served.close();
         await rm(temporary, { recursive: true, force: true });
       },
     };
