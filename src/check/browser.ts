@@ -384,6 +384,7 @@ export async function checkBrowser(
       browser = Bun.spawn([
         options.browser,
         "--headless",
+        "--no-sandbox",
         "--disable-gpu",
         "--enable-logging=stderr",
         `--user-data-dir=${profile}`,
