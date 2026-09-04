@@ -1,0 +1,14 @@
+src/check/browser.ts
+  h_f06c1580a404d7 387
+---
+{
+  "schema_version": "authorship/3.0.0",
+  "git_ai_version": "1.7.0",
+  "base_commit_sha": "902e7c68f1d79d6942a82ba24be3aef60978b2e9",
+  "prompts": {},
+  "humans": {
+    "h_f06c1580a404d7": {
+      "author": "Ramon Dantas <ramon.dantas@facio.com>"
+    }
+  }
+}
