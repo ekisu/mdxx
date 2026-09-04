@@ -77,9 +77,24 @@ mdxx run document.mdx --locked
 mdxx smoke document.mdx
 mdxx smoke document.mdx --locked --browser /path/to/chromium --timeout 10000
 mdxx smoke document.mdx --json
+mdxx check document.mdx --probe check.js --locked --browser /path/to/chromium --timeout 10000 --json
 ```
 
-`build` creates `<document-name>.html` plus content-addressed browser chunks and assets. It refuses to replace an existing output path unless `--replace` is passed. Replacement builds and validates the complete next tree before changing the destination, so a build failure leaves the previous output unchanged and new HTML is never published before its referenced assets. `run` performs the same build in a fresh temporary directory and serves it on `127.0.0.1`. `smoke` builds and serves the document, launches Chromium, and fails unless the runtime reaches its mounted state without browser errors or failed requests. Chromium is selected by `--browser`, then `CHROMIUM_PATH`, then executable Google Chrome or Chromium apps in `/Applications` and `~/Applications` on macOS, then `chromium` on `PATH`; `--json` emits a structured CI result including the selected browser.
+`build` creates `<document-name>.html` plus content-addressed browser chunks and assets. It refuses to replace an existing output path unless `--replace` is passed. Replacement builds and validates the complete next tree before changing the destination, so a build failure leaves the previous output unchanged and new HTML is never published before its referenced assets. `run` performs the same build in a fresh temporary directory and serves it on `127.0.0.1`. `smoke` builds and serves the document, launches Chromium, and fails unless the runtime reaches its mounted state without browser errors or failed requests. `check` performs that normal build exactly once in a temporary directory, waits for the mounted state, and then runs the required caller-supplied `--probe`. The check page posts its result to the loopback server so mdxx can terminate Chrome as soon as the probe settles, with the configured timeout retained as a watchdog. Chromium is selected by `--browser`, then `CHROMIUM_PATH`, then executable Google Chrome or Chromium apps in `/Applications` and `~/Applications` on macOS, then `chromium` on `PATH`; `--json` emits compact `build`, `mount`, and `probe` phases with the selected browser, console entries, errors, and any probe result.
+
+### Check probes
+
+A probe is a JavaScript async function body. It may use `await` and `return`; mdxx supplies `root` (the mounted `#mdxx-root` element), a timeout-bounded `waitFor(test, message)`, and shadow-DOM-aware `shadowRoots(start?)`, `query(selector, start?)`, and `queryAll(selector, start?)` helpers. For example:
+
+```js
+const control = query('[aria-label="Select Release"]');
+if (!control) throw new Error("missing release control");
+control.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+const caption = await waitFor(() => query("figcaption")?.textContent?.startsWith("Release") && query("figcaption"), "caption did not update");
+return { caption: caption.textContent.trim() };
+```
+
+Run it with `mdxx check examples/vanilla-graph/document.mdx --probe examples/vanilla-graph/check.js`. Throwing fails the probe; a return value is included in the result and must consist strictly of JSON primitives, plain objects, and dense arrays. Undefined values, functions, symbols, bigint, non-finite numbers, negative zero, non-plain objects, and cycles fail the probe rather than being omitted or transformed.
 
 The generated `<html>` element exposes `data-mdxx-state="loading|mounting|mounted|error"`. Uncaught errors during loading or mounting are fatal: `data-mdxx-error` and a visible fallback contain the error message, while smoke diagnostics retain the startup phase, stack, and nested causes. After the initial React commit reaches `mounted`, mdxx removes its global startup listeners; later browser diagnostics follow normal browser handling and do not replace the rendered document or change its mdxx state.
 
@@ -101,5 +116,7 @@ An embedded lock records the exact Bun lock state, normalized package graph, tar
 ## Security
 
 Document code is bundled without being imported or evaluated by the build and runs with normal browser authority after client mounting. Built-in modules, remote code imports, computed imports, CommonJS `require`, and absolute imports are rejected; static dynamic imports are included in the browser output graph.
+
+`--probe` is an explicit trust decision. mdxx assumes both the document and selected local probe are trusted; `check` is a verification harness, not an adversarial sandbox. mdxx reads the probe as source and executes it only in the temporary browser check page, with the same browser authority as the document. The bootstrap captures its callback primitive, removes itself from the page, and is served only for the initial navigation; later requests for the document receive the ordinary built artifact. Probe source is never written to or retained in ordinary `build`, `run`, or `smoke` output.
 
 Loopback serving and browser-origin isolation do not make untrusted document code safe. Use a dedicated browser profile or stronger external sandbox for untrusted documents. See [`DESIGN.md`](./DESIGN.md) for the complete format, reproducibility contract, and security boundaries.

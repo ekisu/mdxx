@@ -7,10 +7,12 @@ import { build } from "./commands/build.ts";
 import { lock } from "./commands/lock.ts";
 import { run } from "./commands/run.ts";
 import { smoke } from "./commands/smoke.ts";
+import { check } from "./commands/check.ts";
+import type { CheckError } from "./check/browser.ts";
 import { canonicalJson } from "./shared/canonical-json.ts";
 import { MdxxError } from "./shared/errors.ts";
 
-const USAGE = `Usage: mdxx <init|run|build|lock|unlock|verify|inspect|smoke> [options] <document.mdx>
+const USAGE = `Usage: mdxx <init|run|build|lock|unlock|verify|inspect|smoke|check> [options] <document.mdx>
 
 Build options:
   --output <path>  Output directory (default: dist)
@@ -21,6 +23,13 @@ Smoke options:
   --browser <path> Browser executable
   --timeout <ms>   Timeout in milliseconds (default: 10000)
   --json           Emit a structured result
+
+Check options:
+  --probe <path>   Trusted local JavaScript function body to run after mount (required)
+  --locked         Require a current embedded lock
+  --browser <path> Browser executable
+  --timeout <ms>   Timeout in milliseconds (default: 10000)
+  --json           Emit a compact structured result
 
 Browser selection: --browser, CHROMIUM_PATH, standard macOS Chrome or Chromium apps, then chromium on PATH.
 
@@ -43,8 +52,19 @@ function option(args: string[], name: string): string | undefined {
   return value;
 }
 
+function printCheckError(error: CheckError | undefined): void {
+  if (!error) return;
+  if (error.stack) console.error(error.stack);
+  let cause = error.cause;
+  while (cause) {
+    console.error(`Caused by: ${cause.message}`);
+    if (cause.stack) console.error(cause.stack);
+    cause = cause.cause;
+  }
+}
+
 export async function main(args: string[]): Promise<number> {
-  let jsonOutput = false;
+  const jsonOutput = args.includes("--json");
   try {
     if (args.length === 0 || args.includes("--help") || args.includes("-h")) {
       console.log(USAGE);
@@ -54,11 +74,11 @@ export async function main(args: string[]): Promise<number> {
     const [command, ...argumentsForCommand] = args;
     const rest = [...argumentsForCommand];
     const output = option(rest, "--output");
+    const probe = option(rest, "--probe");
     const browser = option(rest, "--browser");
     const timeoutValue = option(rest, "--timeout");
     const jsonIndex = rest.indexOf("--json");
     const json = jsonIndex >= 0;
-    jsonOutput = json;
     if (json) rest.splice(jsonIndex, 1);
     const lockedIndex = rest.indexOf("--locked");
     const locked = lockedIndex >= 0;
@@ -67,9 +87,11 @@ export async function main(args: string[]): Promise<number> {
     const replace = replaceIndex >= 0;
     if (replace) rest.splice(replaceIndex, 1);
     if (output !== undefined && command !== "build") throw new MdxxError("USAGE", "--output is only valid for build");
-    if (locked && command !== "build" && command !== "run" && command !== "smoke") throw new MdxxError("USAGE", "--locked is only valid for build, run, and smoke");
+    if (probe !== undefined && command !== "check") throw new MdxxError("USAGE", "--probe is only valid for check");
+    if (command === "check" && probe === undefined) throw new MdxxError("USAGE", "--probe is required for check");
+    if (locked && command !== "build" && command !== "run" && command !== "smoke" && command !== "check") throw new MdxxError("USAGE", "--locked is only valid for build, run, smoke, and check");
     if (replace && command !== "build") throw new MdxxError("USAGE", "--replace is only valid for build");
-    if ((browser !== undefined || timeoutValue !== undefined || json) && command !== "smoke") throw new MdxxError("USAGE", "--browser, --timeout, and --json are only valid for smoke");
+    if ((browser !== undefined || timeoutValue !== undefined || json) && command !== "smoke" && command !== "check") throw new MdxxError("USAGE", "--browser, --timeout, and --json are only valid for smoke and check");
     const path = documentArgument(rest);
     switch (command) {
       case "init":
@@ -111,6 +133,18 @@ export async function main(args: string[]): Promise<number> {
         }
         return report.ok ? 0 : 1;
       }
+      case "check": {
+        const report = await check(path, { probe: probe!, locked, browser, ...(timeoutValue === undefined ? {} : { timeout: Number(timeoutValue) }) });
+        if (json) console.log(canonicalJson(report));
+        else if (report.ok) console.log(`${path}: check passed`);
+        else {
+          console.error(`mdxx: check failed during ${report.phase}: ${report.error?.message ?? "unknown error"}`);
+          printCheckError(report.error);
+          for (const diagnostic of report.diagnostics ?? []) console.error(diagnostic);
+          for (const entry of report.console) console.error(entry);
+        }
+        return report.ok ? 0 : 1;
+      }
       default:
         throw new MdxxError("USAGE", `unknown command: ${command}\n${USAGE}`);
     }
@@ -118,7 +152,12 @@ export async function main(args: string[]): Promise<number> {
   } catch (error) {
     if (jsonOutput) {
       const message = error instanceof Error ? error.message : String(error);
-      console.log(canonicalJson({ ok: false, state: "error", phase: "setup", error: { message }, console: [], failedRequests: [] }, 2));
+      if (args[0] === "check") {
+        const phase = error instanceof MdxxError && error.code === "USAGE" ? "usage" : "setup";
+        console.log(canonicalJson({ ok: false, phase, phases: { build: "skipped", mount: "skipped", probe: "skipped" }, error: { message }, console: [] }));
+      } else {
+        console.log(canonicalJson({ ok: false, state: "error", phase: "setup", error: { message }, console: [], failedRequests: [] }, 2));
+      }
     } else console.error(formatError(error));
     return error instanceof MdxxError && error.code === "USAGE" ? 2 : 1;
   }
